@@ -3607,7 +3607,7 @@ dependencies = [
 
 [[package]]
 name = "tailscale-commander-elite"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "log",
  "serde_json",

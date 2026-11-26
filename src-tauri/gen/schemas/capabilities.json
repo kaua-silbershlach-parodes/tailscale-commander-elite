@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capability for the main window: core APIs, signed updates, and process restart after an update.","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:allow-restart"]}}
+{"default":{"identifier":"default","description":"Default capability for the main window: app version read, signed updates, and process restart after an update.","local":true,"windows":["main"],"permissions":["core:app:allow-version","updater:default","process:allow-restart"]}}

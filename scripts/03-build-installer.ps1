@@ -35,6 +35,7 @@ if (-not (Test-Path $Conf)) { throw "Project not found at $Project. Run script 0
 $KeyDir = Join-Path $env:USERPROFILE '.tailscale-commander-elite'
 $KeyFile = Join-Path $KeyDir 'updater-private.key'
 New-Item -ItemType Directory -Force -Path $KeyDir | Out-Null
+& icacls $KeyDir /inheritance:r /grant:r "$env:USERNAME:(OI)(CI)F" | Out-Null
 if (-not (Test-Path $KeyFile)) {
     Write-Host 'Generating the updater signing keypair on this machine...'
     & cargo tauri signer generate -w $KeyFile
@@ -44,12 +45,12 @@ $pubFile = "$KeyFile.pub"
 if (-not (Test-Path $pubFile)) { throw "Public key not found at $pubFile" }
 $pubKey = (Get-Content $pubFile -Raw).Trim()
 
-$confText = Get-Content $Conf -Raw
-if ($confText -match 'UPDATER_PUBKEY_PLACEHOLDER') {
-    $confText = $confText -replace 'UPDATER_PUBKEY_PLACEHOLDER', $pubKey
-    Set-Content -Path $Conf -Value $confText -Encoding ASCII
+$confJson = Get-Content $Conf -Raw | ConvertFrom-Json
+if ($confJson.plugins.updater.pubkey -eq 'UPDATER_PUBKEY_PLACEHOLDER') {
+    $confJson.plugins.updater.pubkey = $pubKey
+    $confJson | ConvertTo-Json -Depth 10 | Set-Content -Path $Conf -Encoding ASCII
     Write-Host 'Public key written into tauri.conf.json (commit this change).'
-} elseif ($confText -notmatch [regex]::Escape($pubKey)) {
+} elseif ($confJson.plugins.updater.pubkey -ne $pubKey) {
     throw 'tauri.conf.json carries a DIFFERENT public key than this machine''s key. Refusing to build a release this key cannot sign for.'
 }
 

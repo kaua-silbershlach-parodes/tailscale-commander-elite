@@ -22,6 +22,9 @@ jobs:
           $tag = $env:GITHUB_REF_NAME -replace '^v',''
           $conf = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           if ($tag -ne $conf) { throw "tag $tag != tauri.conf $conf" }
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          $mix = (Select-String -Path backend/mix.exs -Pattern 'version: "([^"]+)"').Matches[0].Groups[1].Value
+          if ($tag -ne $cargo -or $tag -ne $mix) { throw "version mismatch: tag $tag, cargo $cargo, mix $mix" }
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: '1.17'
@@ -40,6 +43,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
+          if-no-files-found: error
           name: windows
           path: src-tauri/target/release/bundle/nsis/*
   linux:
@@ -62,6 +66,9 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           conf=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
           test "$tag" = "$conf"
+          cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          mix=$(grep -m1 'version: "' backend/mix.exs | cut -d'"' -f2)
+          test "$tag" = "$cargo" && test "$tag" = "$mix"
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: '1.17'
@@ -77,6 +84,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
+          if-no-files-found: error
           name: linux
           path: |
             src-tauri/target/release/bundle/deb/*.deb

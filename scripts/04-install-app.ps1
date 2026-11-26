@@ -27,6 +27,10 @@ $BundleDir = Join-Path $WorkFolder 'tailscale-commander-elite\src-tauri\target\r
 $setup = Get-ChildItem $BundleDir -Filter '*setup*.exe' |
          Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $setup) { throw 'No Setup.exe found. Run script 03 first.' }
+$sig = Get-Item "$($setup.FullName).sig" -ErrorAction SilentlyContinue
+if (-not $sig) { throw "Setup has no paired signature: $($setup.Name). Refusing to install." }
+$hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
+Write-Host "Setup verified: paired signature present, SHA256 $hash"
 
 Write-Host "Installing silently: $($setup.FullName)"
 $installer = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru

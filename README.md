@@ -21,6 +21,7 @@ Tailscale Commander Elite is a desktop base by A Elite Estrangeira, built on the
 - [x] Release workflow fixed to install the Tauri CLI
 - [x] v1.1.1 published with Windows and Linux assets
 - [x] Whole project re-read against book 1; missed hardening applied in v1.2.0
+- [x] Page-by-page audit completed; operating loop and remaining gaps applied in v1.2.1
 
 ## Book improvements applied
 
@@ -36,6 +37,8 @@ Book 1 was applied only where it hardens code that already exists in this projec
 - [x] Real CSP, prototype freezing, and least-privilege window capabilities
 - [x] Release workflow: read-only permissions, version/secret checks, backend tests, complete signed artifacts
 - [x] Scripts and smoke tests fail closed: installer exit codes, paired signatures, backend health check
+- [x] Scheduled audit workflow: dependency advisories, version sync, feed consistency
+- [x] Security operating record: boundary, inventory, risks, loop, and release authorization checklist
 
 The full book sequence is tracked in `BOOK_CHECKLIST.md`.
 

@@ -8,6 +8,7 @@ const relaunch = tauri.process?.relaunch;
 
 const el = (id) => document.getElementById(id);
 let pendingUpdate = null;
+let pendingUpdateAt = 0;
 
 function errText(err) {
   return err?.message ?? String(err);
@@ -60,6 +61,7 @@ async function checkNow() {
       return;
     }
     pendingUpdate = update;
+    pendingUpdateAt = Date.now();
     setState('update available: ' + update.version);
     logLine(`Update found: ${update.version} (current: ${update.currentVersion}).`);
     el('btn-download').disabled = false;
@@ -73,6 +75,11 @@ async function checkNow() {
 
 async function downloadAndInstall() {
   if (!pendingUpdate) return;
+  if (Date.now() - pendingUpdateAt > 600000) {
+    logLine('Update check is stale; rechecking before install.');
+    await checkNow();
+    if (!pendingUpdate) return;
+  }
   el('btn-download').disabled = true;
   el('btn-check').disabled = true;
   setProgress(0);

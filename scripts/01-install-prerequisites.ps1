@@ -75,7 +75,7 @@ $cargo = & cargo --version
 Write-Host "Rust OK: $rustc | $cargo"
 
 Write-Host 'Installing the Tauri CLI (compiles from source, takes a few minutes)...'
-& cargo install tauri-cli --version '^2'
+& cargo install tauri-cli --version '^2' --locked
 if ($LASTEXITCODE -ne 0) { throw "tauri-cli install failed (exit $LASTEXITCODE)." }
 $tauri = & cargo tauri --version
 Write-Host "Tauri CLI OK: $tauri"
@@ -94,6 +94,8 @@ if (-not (Test-Path $ErlExe)) {
     if ($LASTEXITCODE -ne 0) { throw "Erlang download failed (curl exit $LASTEXITCODE)." }
 }
 if ((Get-Item $ErlExe).Length -ne $ErlSize) { throw 'Erlang installer size mismatch. Aborting.' }
+$sigStatus = (Get-AuthenticodeSignature $ErlExe).Status
+if ($sigStatus -ne 'Valid') { throw "Erlang installer Authenticode signature is $sigStatus. Aborting." }
 Write-Host 'Erlang installer verified: exact size, official host. Installing silently...'
 Start-Process $ErlExe -ArgumentList '/S', "/D=$ErlDir" -Wait
 $erlBin = $null
@@ -129,12 +131,12 @@ Write-Host 'Elixir zip verified: exact size and SHA256.'
 $ExDir = "${Drive}:\elixir"
 $staging = "${Drive}:\elixir-staging"
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
-if (Test-Path $ExDir) { Remove-Item $ExDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $staging | Out-Null
 & tar.exe -xf $ExZip -C $staging
 if ($LASTEXITCODE -ne 0) { throw 'Elixir extraction failed.' }
 $bat = Get-ChildItem $staging -Recurse -Filter 'elixir.bat' | Select-Object -First 1
 if (-not $bat) { throw 'elixir.bat not found in the extracted zip.' }
+if (Test-Path $ExDir) { Remove-Item $ExDir -Recurse -Force }
 Move-Item $bat.Directory.Parent.FullName $ExDir
 Remove-Item $staging -Recurse -Force
 $exBin = Join-Path $ExDir 'bin'

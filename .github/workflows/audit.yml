@@ -1,0 +1,50 @@
+name: Audit
+# Scheduled posture checks between releases: dependency advisories,
+# backend tests, version sync, and published feed consistency.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: RustSec dependency audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Backend tests
+        working-directory: backend
+        run: mix test
+      - name: Version sync
+        run: |
+          conf=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          mix=$(grep -m1 'version: "' backend/mix.exs | cut -d'"' -f2)
+          test "$conf" = "$cargo" && test "$conf" = "$mix"
+      - name: Published feed consistency
+        run: |
+          curl -fsSL https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json -o /tmp/latest.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open('/tmp/latest.json'))
+          assert d['version'], 'feed without version'
+          for platform in ('windows-x86_64', 'linux-x86_64'):
+              p = d['platforms'][platform]
+              assert p['signature'].strip(), f'{platform} without signature'
+              assert p['url'].startswith('https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/download/'), f'{platform} url outside repo'
+          print('feed ok', d['version'])
+          PY

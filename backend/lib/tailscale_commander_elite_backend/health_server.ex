@@ -83,6 +83,7 @@ defmodule TailscaleCommanderEliteBackend.HealthServer do
   end
 
   defp maybe_serve(socket, state) when state.workers >= @max_workers do
+    Logger.warning("health server worker cap reached; connection closed")
     :gen_tcp.close(socket)
     state
   end
@@ -186,9 +187,11 @@ defmodule TailscaleCommanderEliteBackend.HealthServer do
         {"404 Not Found", ""}
 
       {:ok, _denied} ->
+        Logger.warning("health server denied request (404)")
         {"404 Not Found", ~s({"error":"not found"})}
 
       :error ->
+        Logger.warning("health server rejected malformed request (400)")
         {"400 Bad Request", ~s({"error":"bad request"})}
     end
   end

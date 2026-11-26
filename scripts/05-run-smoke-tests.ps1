@@ -38,9 +38,11 @@ $proc = Get-Process -Id $launched.Id -ErrorAction SilentlyContinue
 if (-not $proc) { throw 'The app process is not running after launch.' }
 Write-Host "   App running (PID $($proc.Id))."
 
+$backendNote = 'not running (separate OTP app; health check skipped)'
 try {
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:45900/health' -TimeoutSec 5
     if ($health.service -ne 'tailscale_commander_elite_backend') { throw 'Unexpected backend service.' }
+    $backendNote = "health OK (version $($health.version))"
     Write-Host "   Backend health OK (version $($health.version))."
 } catch {
     Write-Host '   Backend not running (separate OTP app; health check skipped).'
@@ -54,6 +56,7 @@ $record = Join-Path ([Environment]::GetFolderPath('Desktop')) 'TAILSCALE-COMMAND
     "Install folder: $installDir"
     "Installed version: $installed"
     "Update feed: $feedNote"
+    "Backend: $backendNote"
     "Feed: $feedUrl"
     'Result: installed app, update feed availability and app launch verified.'
 ) | Set-Content -Path $record -Encoding ASCII
