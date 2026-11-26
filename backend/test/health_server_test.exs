@@ -1,75 +1,140 @@
 defmodule TailscaleCommanderEliteBackend.HealthServerTest do
-  use ExUnit.Case, async: true
-
+  use ExUnit.Case, async: false
   alias TailscaleCommanderEliteBackend.{Application, HealthServer}
 
-  test "GET /health is allowed with the full JSON contract" do
-    {status, body} = HealthServer.handle_request("GET /health HTTP/1.1\r\nHost: 127.0.0.1:45900\r\n\r\n")
-    assert status == "200 OK"
+  defp request(method, path, host \\ "127.0.0.1:45900"), do: "#{method} #{path} HTTP/1.1\r\nHost: #{host}\r\n\r\n"
+  test "health contract and default deny" do
+    assert {"200 OK", body} = HealthServer.handle_request(request("GET", "/health"))
     assert body =~ ~s("status":"ok")
     assert body =~ ~s("service":"tailscale_commander_elite_backend")
     assert body =~ ~s("version":")
+    for {method, path} <- [{"GET", "/anything"}, {"GET", "/health?x=1"}, {"POST", "/health"}] do
+      assert {"404 Not Found", _} = HealthServer.handle_request(request(method, path))
+    end
+    assert {"404 Not Found", ""} = HealthServer.handle_request(request("HEAD", "/health"))
+    assert {"200 OK", _} = HealthServer.handle_request("GET /health HTTP/1.0\r\n\r\n")
   end
 
-  test "HTTP/1.0 without Host is allowed" do
-    {status, _body} = HealthServer.handle_request("GET /health HTTP/1.0\r\n\r\n")
-    assert status == "200 OK"
+  test "reject absent, duplicate, malformed and foreign Host and unsupported body" do
+    for raw <- ["GET /health HTTP/1.1\r\n\r\n", request("GET", "/health", "evil.example"),
+                "GET /health HTTP/1.1\r\nHost: localhost\r\nHost: localhost\r\n\r\n",
+                "GET /health HTTP/1.1\r\nHost : localhost\r\n\r\n",
+                "GET /health HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1\r\n\r\n",
+                "GET /health HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n",
+                "GET /health HTTP/1.1\r\nHost: localhost\r\n\r\nextra",
+                "GET /health GARBAGE\r\n\r\n", "GET /health\r\n\r\n", <<255>>] do
+      assert {"400 Bad Request", _} = HealthServer.handle_request(raw)
+    end
   end
 
-  test "unknown paths are denied by default" do
-    {status, _body} = HealthServer.handle_request("GET /anything HTTP/1.1\r\n\r\n")
-    assert status == "404 Not Found"
-  end
-
-  test "query-string target is denied" do
-    {status, _body} = HealthServer.handle_request("GET /health?x=1 HTTP/1.1\r\n\r\n")
-    assert status == "404 Not Found"
-  end
-
-  test "non-GET methods are denied" do
-    {status, _body} = HealthServer.handle_request("POST /health HTTP/1.1\r\n\r\n")
-    assert status == "404 Not Found"
-  end
-
-  test "HEAD is denied without a body" do
-    {status, body} = HealthServer.handle_request("HEAD /health HTTP/1.1\r\n\r\n")
-    assert status == "404 Not Found"
-    assert body == ""
-  end
-
-  test "non-loopback Host is rejected" do
-    {status, _body} =
-      HealthServer.handle_request("GET /health HTTP/1.1\r\nHost: evil.example\r\n\r\n")
-
-    assert status == "400 Bad Request"
-  end
-
-  test "malformed request lines get 400" do
-    assert {"400 Bad Request", _} = HealthServer.handle_request("GET /health GARBAGE\r\n\r\n")
-    assert {"400 Bad Request", _} = HealthServer.handle_request("GET /health\r\n\r\n")
-    assert {"400 Bad Request", _} = HealthServer.handle_request("garbage\r\n\r\n")
-  end
-
-  test "size cap boundary: 8192 allowed through, 8193 rejected" do
-    base = "GET /health HTTP/1.1\r\nX-Pad: "
+  test "size boundary" do
+    base = "GET /health HTTP/1.1\r\nHost: localhost\r\nX-Pad: "
     suffix = "\r\n\r\n"
     pad = 8_192 - byte_size(base) - byte_size(suffix)
-    exact = base <> String.duplicate("x", pad) <> suffix
-    assert byte_size(exact) == 8_192
-    assert {"200 OK", _} = HealthServer.handle_request(exact)
-
-    over = base <> String.duplicate("x", pad + 1) <> suffix
-    assert {"413 Payload Too Large", _} = HealthServer.handle_request(over)
+    assert {"200 OK", _} = HealthServer.handle_request(base <> String.duplicate("x", pad) <> suffix)
+    assert {"413 Payload Too Large", _} = HealthServer.handle_request(base <> String.duplicate("x", pad + 1) <> suffix)
   end
 
-  test "port parsing is strict" do
+  test "strict port parsing" do
     assert Application.parse_port(nil) == {:ok, 45_900}
     assert Application.parse_port("45900") == {:ok, 45_900}
     assert Application.parse_port("0") == {:ok, 0}
-    assert {:error, _} = Application.parse_port("abc")
-    assert {:error, _} = Application.parse_port("45900x")
-    assert {:error, _} = Application.parse_port("-1")
-    assert {:error, _} = Application.parse_port("99999")
-    assert {:error, _} = Application.parse_port("")
+    for bad <- ["abc", "45900x", "-1", "99999", ""] do
+      assert {:error, _} = Application.parse_port(bad)
+    end
+  end
+
+  defp connect(port), do: :gen_tcp.connect({127, 0, 0, 1}, port, [:binary, active: false], 1_000)
+  defp port, do: :sys.get_state(HealthServer).port
+  defp exchange(port) do
+    {:ok, socket} = connect(port)
+    try do
+      :ok = :gen_tcp.send(socket, request("GET", "/health", "localhost:#{port}"))
+      response = receive_response(socket, 2_000)
+      assert response =~ "HTTP/1.1 200 OK"
+      assert response =~ ~s("status":"ok")
+    after
+      :gen_tcp.close(socket)
+    end
+  end
+
+  # TCP does not preserve message boundaries; collect until connection close.
+  defp receive_response(socket, timeout, acc \\ "") do
+    case :gen_tcp.recv(socket, 0, timeout) do
+      {:ok, chunk} -> receive_response(socket, timeout, acc <> chunk)
+      {:error, :closed} -> acc
+      {:error, reason} -> flunk("TCP response failed: #{inspect(reason)}")
+    end
+  end
+
+  test "more than 32 consecutive TCP health checks do not exhaust workers" do
+    p = port()
+    for _ <- 1..80, do: exchange(p)
+  end
+
+  test "a slow TCP client does not block independent health checks" do
+    p = port()
+    {:ok, slow} = connect(p)
+    try do
+      :ok = :gen_tcp.send(slow, "GET /health HTTP/1.1\r\n")
+      exchange(p)
+      response = receive_response(slow, 7_000)
+      assert response =~ "408 Request Timeout"
+      exchange(p)
+    after
+      :gen_tcp.close(slow)
+    end
+  end
+
+  defp await_workers(count, deadline) do
+    state = :sys.get_state(HealthServer)
+    cond do
+      map_size(state.workers) == count -> :ok
+      System.monotonic_time(:millisecond) >= deadline -> flunk("worker count: #{map_size(state.workers)}, expected #{count}")
+      true -> Process.sleep(10); await_workers(count, deadline)
+    end
+  end
+
+  test "worker cap rejects excess connection and recovers after close" do
+    p = port()
+    {:ok, {{127, 0, 0, 1}, ^p}} = :inet.sockname(:sys.get_state(HealthServer).listen)
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    sockets = for _ <- 1..32 do
+      {:ok, socket} = connect(p)
+      :ok = :gen_tcp.send(socket, "GET /health HTTP/1.1\r\n")
+      socket
+    end
+    try do
+      await_workers(32, System.monotonic_time(:millisecond) + 2_000)
+      {:ok, excess} = connect(p)
+      try do
+        assert {:error, reason} = :gen_tcp.recv(excess, 0, 2_000)
+        assert reason in [:closed, :econnreset]
+      after
+        :gen_tcp.close(excess)
+      end
+    after
+      Enum.each(sockets, &:gen_tcp.close/1)
+    end
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    exchange(p)
+  end
+
+  test "oversized and malformed real TCP requests fail closed" do
+    p = port()
+    for {raw, status} <- [
+      {"GET /health HTTP/1.1\r\n\r\n", "400 Bad Request"},
+      {"GET /health HTTP/1.1\r\nHost: localhost\r\nX-Pad: " <> String.duplicate("a", 8_200) <> "\r\n\r\n", "413 Payload Too Large"},
+      {"POST /health HTTP/1.1\r\nHost: localhost\r\n\r\n", "404 Not Found"}
+    ] do
+      {:ok, socket} = connect(p)
+      try do
+        :ok = :gen_tcp.send(socket, raw)
+        assert receive_response(socket, 2_000) =~ "HTTP/1.1 #{status}"
+      after
+        :gen_tcp.close(socket)
+      end
+    end
+    exchange(p)
   end
 end

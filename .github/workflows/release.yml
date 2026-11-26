@@ -8,11 +8,31 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  authorization:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Require recorded release authorization
+        run: |
+          grep -Fx 'Release authorization: APPROVED' SECURITY_AUDIT.md
+          grep -Eq '^- \[x\] 1\. Book 1 ' BOOK_CHECKLIST.md
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Require clean dependency audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit --deny warnings
   windows:
+    needs: authorization
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Check versions and signing secret
         shell: pwsh
         env:
@@ -25,39 +45,46 @@ jobs:
           $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
           $mix = (Select-String -Path backend/mix.exs -Pattern 'version: "([^"]+)"').Matches[0].Groups[1].Value
           if ($tag -ne $cargo -or $tag -ne $mix) { throw "version mismatch: tag $tag, cargo $cargo, mix $mix" }
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: '1.17'
           otp-version: '27'
       - name: Backend tests
         working-directory: backend
+        env:
+          TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
         run: mix test
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo install tauri-cli --version 2.12.6 --locked
       - name: Build Windows bundle
         working-directory: src-tauri
-        run: cargo tauri build --bundles nsis
+        run: cargo tauri build --bundles nsis -- --locked
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           if-no-files-found: error
           name: windows
           path: src-tauri/target/release/bundle/nsis/*
   linux:
+    needs: authorization
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
       - name: Install Tauri Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev patchelf file
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo install tauri-cli --version 2.12.6 --locked
       - name: Check versions and signing secret
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -69,20 +96,22 @@ jobs:
           cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
           mix=$(grep -m1 'version: "' backend/mix.exs | cut -d'"' -f2)
           test "$tag" = "$cargo" && test "$tag" = "$mix"
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: '1.17'
           otp-version: '27'
       - name: Backend tests
         working-directory: backend
+        env:
+          TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
         run: mix test
       - name: Build Linux bundles
         working-directory: src-tauri
-        run: cargo tauri build --bundles deb,appimage
+        run: cargo tauri build --bundles deb,appimage -- --locked
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           if-no-files-found: error
           name: linux

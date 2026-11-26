@@ -2,7 +2,7 @@
 
 Source library: F-Society - Intel Books (1,146 books). One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
 
-- [x] 1. Book 1 (applied in v1.1.1, completed in v1.2.0 after a full project re-read)
+- [ ] 1. Book 1 (historically applied through v1.2.1; reopened for independent validation, see SECURITY_AUDIT.md)
   - [x] Backend answers only `GET /health`
   - [x] Unknown routes and non-GET methods are denied by default
   - [x] Oversized backend requests are rejected

@@ -1,0 +1,64 @@
+name: Book 1 candidate validation
+on:
+  push:
+    branches: [review/book1-v1.2.2]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev patchelf file
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Backend native tests
+        working-directory: backend
+        env:
+          TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
+        run: mix test
+      - name: UI regression tests
+        run: node --test tests/test_ui.cjs
+      - name: Rust regression tests
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: Unsigned executable build
+        working-directory: src-tauri
+        run: cargo build --release --locked
+  security:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Install signature verifier
+        run: sudo apt-get update && sudo apt-get install -y minisign python3-cryptography
+      - name: Cryptographic regression tests
+        run: /usr/bin/python3 -m unittest discover -s tools -p test_verify_release.py
+      - name: Verify the currently published stable release
+        run: /usr/bin/python3 tools/verify_release.py latest
+      - name: Dependency audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit --deny warnings

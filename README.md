@@ -1,5 +1,7 @@
 # Tailscale Commander Elite
 
+> Local security re-audit candidate: Book 1 is reopened until the remaining findings, tests and release authorization gates in [SECURITY_AUDIT.md](SECURITY_AUDIT.md) are satisfied. Historical release checklist entries are not authorization of this candidate.
+
 Tailscale Commander Elite is a desktop base by A Elite Estrangeira, built on the Machinery template with a Tauri 2 shell, an Elixir/OTP backend sidecar, and signed auto-updates.
 
 ## What is inside

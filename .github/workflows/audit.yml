@@ -15,19 +15,23 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
       - name: RustSec dependency audit
         working-directory: src-tauri
         run: |
-          cargo install cargo-audit --locked
+          cargo install cargo-audit --version 0.23.0 --locked
           cargo audit
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: '1.17'
           otp-version: '27'
       - name: Backend tests
         working-directory: backend
+        env:
+          TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
         run: mix test
       - name: Version sync
         run: |
@@ -35,16 +39,9 @@ jobs:
           cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
           mix=$(grep -m1 'version: "' backend/mix.exs | cut -d'"' -f2)
           test "$conf" = "$cargo" && test "$conf" = "$mix"
-      - name: Published feed consistency
+      - name: Install independent signature verifier
+        run: sudo apt-get update && sudo apt-get install -y minisign python3-cryptography
+      - name: Verify published release and feed signatures
         run: |
-          curl -fsSL https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json -o /tmp/latest.json
-          python3 - <<'PY'
-          import json
-          d = json.load(open('/tmp/latest.json'))
-          assert d['version'], 'feed without version'
-          for platform in ('windows-x86_64', 'linux-x86_64'):
-              p = d['platforms'][platform]
-              assert p['signature'].strip(), f'{platform} without signature'
-              assert p['url'].startswith('https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/download/'), f'{platform} url outside repo'
-          print('feed ok', d['version'])
-          PY
+          /usr/bin/python3 -m unittest discover -s tools -p test_verify_release.py
+          /usr/bin/python3 tools/verify_release.py latest

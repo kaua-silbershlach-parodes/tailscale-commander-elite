@@ -34,13 +34,33 @@ if (-not (Test-Path $Conf)) { throw "Project not found at $Project. Run script 0
 
 $KeyDir = Join-Path $env:USERPROFILE '.tailscale-commander-elite'
 $KeyFile = Join-Path $KeyDir 'updater-private.key'
-New-Item -ItemType Directory -Force -Path $KeyDir | Out-Null
-& icacls $KeyDir /inheritance:r /grant:r "$env:USERNAME:(OI)(CI)F" | Out-Null
+$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+function Assert-RestrictedKeyAcl([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Signing key path is a reparse point: $Path" }
+    $acl = Get-Acl -LiteralPath $Path
+    if ($acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -ne $sid) {
+        throw "Signing key path has an unexpected owner: $Path"
+    }
+    foreach ($rule in $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
+        if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin @($sid, 'S-1-5-18')) {
+            throw "Signing key path grants access to an unexpected principal: $Path"
+        }
+    }
+}
+if (-not (Test-Path -LiteralPath $KeyDir)) { New-Item -ItemType Directory -Path $KeyDir | Out-Null }
+if ((Get-Item -LiteralPath $KeyDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Signing directory reparse point.' }
+& icacls $KeyDir /inheritance:r /grant:r "*${sid}:(OI)(CI)F" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Signing key directory ACL update failed." }
+Assert-RestrictedKeyAcl $KeyDir
+$confJson = Get-Content $Conf -Raw | ConvertFrom-Json
 if (-not (Test-Path $KeyFile)) {
+    if ($confJson.plugins.updater.pubkey -ne 'UPDATER_PUBKEY_PLACEHOLDER') { throw 'Existing pinned public key requires its matching pre-provisioned private key.' }
     Write-Host 'Generating the updater signing keypair on this machine...'
     & cargo tauri signer generate -w $KeyFile
     if ($LASTEXITCODE -ne 0) { throw "Key generation failed (exit $LASTEXITCODE)." }
 }
+Assert-RestrictedKeyAcl $KeyFile
 $pubFile = "$KeyFile.pub"
 if (-not (Test-Path $pubFile)) { throw "Public key not found at $pubFile" }
 $pubKey = (Get-Content $pubFile -Raw).Trim()
@@ -59,18 +79,23 @@ if ((Get-Content $Conf -Raw) -match '"version"\s*:\s*"([^"]+)"') { $version = $M
 Write-Host "Building version $version (cargo tauri build - this compiles the release binary)..."
 
 $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $KeyFile -Raw)
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
-& cargo tauri build --manifest-path (Join-Path $TauriDir 'Cargo.toml')
-$buildRc = $LASTEXITCODE
-Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
-Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+try {
+    & cargo tauri build --manifest-path (Join-Path $TauriDir 'Cargo.toml') -- --locked
+    $buildRc = $LASTEXITCODE
+} finally {
+    Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+}
 if ($buildRc -ne 0) { throw "Build failed (cargo tauri exit $buildRc)." }
 
 $bundleDir = Join-Path $TauriDir 'target\release\bundle\nsis'
-$setup = Get-ChildItem $bundleDir -Filter "*$version*setup*.exe" | Select-Object -First 1
+if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid build version.' }
+$setup = Get-Item -LiteralPath (Join-Path $bundleDir "Tailscale Commander Elite_${version}_x64-setup.exe") -ErrorAction Stop
 if (-not $setup) { throw "Missing Setup for version $version in $bundleDir." }
 $sig = Get-Item "$($setup.FullName).sig" -ErrorAction SilentlyContinue
 if (-not $sig) { throw "Missing signature for $($setup.Name)." }
+& python (Join-Path $Project "tools\verify_release.py") --config $Conf artifact $setup.FullName $sig.FullName
+if ($LASTEXITCODE -ne 0) { throw "Installer signature verification failed." }
 $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
 
 Write-Host "BUILD OK: $($setup.Name) ($($setup.Length) bytes, SHA256 $hash) + signature, in $bundleDir"

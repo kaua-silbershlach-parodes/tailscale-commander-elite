@@ -9,6 +9,9 @@ const relaunch = tauri.process?.relaunch;
 const el = (id) => document.getElementById(id);
 let pendingUpdate = null;
 let pendingUpdateAt = 0;
+let installing = false;
+let checking = false;
+let restartRequired = false;
 
 function errText(err) {
   return err?.message ?? String(err);
@@ -48,6 +51,8 @@ async function init() {
 }
 
 async function checkNow() {
+  if (checking || installing || restartRequired) return;
+  checking = true;
   el('btn-check').disabled = true;
   el('btn-download').disabled = true;
   pendingUpdate = null;
@@ -69,17 +74,19 @@ async function checkNow() {
     setState('check failed');
     logLine('Update check failed: ' + errText(err));
   } finally {
-    el('btn-check').disabled = false;
+    checking = false;
+    el('btn-check').disabled = restartRequired;
   }
 }
 
 async function downloadAndInstall() {
-  if (!pendingUpdate) return;
+  if (!pendingUpdate || installing || checking || restartRequired) return;
   if (Date.now() - pendingUpdateAt > 600000) {
-    logLine('Update check is stale; rechecking before install.');
+    logLine('Update check is stale; review the refreshed result before installing.');
     await checkNow();
-    if (!pendingUpdate) return;
+    return;
   }
+  installing = true;
   el('btn-download').disabled = true;
   el('btn-check').disabled = true;
   setProgress(0);
@@ -101,15 +108,22 @@ async function downloadAndInstall() {
         logLine('Download finished.');
       }
     });
+    pendingUpdate = null;
+    pendingUpdateAt = 0;
+    restartRequired = true;
     setState('update installed - restart to apply');
     logLine('Update installed. Restart the app to apply it.');
     el('btn-restart').classList.remove('hidden');
   } catch (err) {
     setState('install failed');
     logLine('Download/install failed: ' + errText(err));
-    el('btn-download').disabled = false;
+    pendingUpdate = null;
+    pendingUpdateAt = 0;
+    el('btn-download').disabled = true;
+    logLine('Check for updates again before retrying.');
   } finally {
-    el('btn-check').disabled = false;
+    installing = false;
+    el('btn-check').disabled = restartRequired;
   }
 }
 

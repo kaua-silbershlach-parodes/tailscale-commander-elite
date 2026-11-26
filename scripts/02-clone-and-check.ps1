@@ -28,6 +28,8 @@ New-Item -ItemType Directory -Force -Path $WorkFolder | Out-Null
 if (Test-Path (Join-Path $Project '.git')) {
     $origin = & git -C $Project remote get-url origin
     if ($origin -ne $RepoUrl) { throw "Unexpected origin: $origin" }
+    $dirty = & git -C $Project status --porcelain
+    if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Existing clone is not clean. Refusing to pull.' }
     Write-Host 'Existing clone found. Pulling...'
     & git -C $Project pull --ff-only
     if ($LASTEXITCODE -ne 0) { throw "git pull failed (exit $LASTEXITCODE)." }
@@ -38,15 +40,24 @@ if (Test-Path (Join-Path $Project '.git')) {
 }
 
 Write-Host 'Type-checking the Rust shell (cargo check)...'
-& cargo check --manifest-path (Join-Path $Project 'src-tauri\Cargo.toml')
+& cargo check --locked --manifest-path (Join-Path $Project 'src-tauri\Cargo.toml')
 if ($LASTEXITCODE -ne 0) { throw "cargo check failed (exit $LASTEXITCODE)." }
 
 if (Get-Command mix -ErrorAction SilentlyContinue) {
     Write-Host 'Running backend tests (mix test)...'
     Push-Location (Join-Path $Project 'backend')
-    try { & mix test; if ($LASTEXITCODE -ne 0) { throw "mix test failed (exit $LASTEXITCODE)." } } finally { Pop-Location }
+    $priorPort = $env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT
+    try {
+        $env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT = '0'
+        & mix test
+        if ($LASTEXITCODE -ne 0) { throw "mix test failed (exit $LASTEXITCODE)." }
+    } finally {
+        if ($null -eq $priorPort) { Remove-Item Env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT -ErrorAction SilentlyContinue }
+        else { $env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT = $priorPort }
+        Pop-Location
+    }
 } else {
-    Write-Host 'mix not found: backend tests skipped (run script 01).'
+    throw 'mix not found: mandatory backend tests cannot run (run script 01).'
 }
 
 Write-Host "CHECK OK: $Project compiles clean on this machine."
