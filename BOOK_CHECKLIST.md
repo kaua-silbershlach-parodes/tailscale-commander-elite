@@ -1,6 +1,6 @@
 # Tailscale Commander Elite - book checklist
 
-One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
+Source library: F-Society - Intel Books (1,146 books). One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
 
 - [x] 1. Book 1 (applied in v1.1.1)
   - [x] Backend answers only `GET /health`
