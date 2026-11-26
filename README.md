@@ -23,7 +23,7 @@ Tailscale Commander Elite is a desktop base by A Elite Estrangeira, built on the
 
 ## Book improvements applied
 
-Book 1, *Planning for a Zero Trust Architecture*, was applied only where it hardens code that already exists in this project:
+Book 1 was applied only where it hardens code that already exists in this project:
 
 - [x] Only `GET /health` is answered by the backend
 - [x] Unknown routes and non-GET methods are denied by default
