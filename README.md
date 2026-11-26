@@ -1,4 +1,6 @@
 # Tailscale Commander Elite - desktop base by A Elite Estrangeira
+v1
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/857a2a55-e680-483b-bf2a-25439de3d094" />
 
 Tailscale Commander Elite is a desktop base built by A Elite Estrangeira on the Machinery template: a Tauri (Rust) shell with an Elixir/OTP backend sidecar and signed auto-updates.
 
