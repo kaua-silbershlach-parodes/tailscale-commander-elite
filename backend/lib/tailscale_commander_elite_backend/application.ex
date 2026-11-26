@@ -10,6 +10,7 @@ defmodule TailscaleCommanderEliteBackend.Application do
       end
 
     children = [
+      TailscaleCommanderEliteBackend.Audit,
       {TailscaleCommanderEliteBackend.HealthServer, port}
     ]
 

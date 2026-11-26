@@ -9,7 +9,9 @@ Tailscale Commander Elite is a desktop base built by A Elite Estrangeira on the 
 - Tauri 2 desktop app for Windows with an NSIS installer
 - Elixir/OTP backend sidecar with a local health endpoint on 127.0.0.1:45900
 - Signed auto-updates through the GitHub release feed (latest.json)
-- English interface with Updates and Backend panels
+- English interface with Updates, Zero Trust and Backend panels
+- Zero-trust policy core in the backend: default deny, per-request access simulation with reasons, HIGH-impact step-up approval, posture quarantine, audit log (book 1 of BOOK_CHECKLIST.md)
+- GitHub Actions release workflow building Windows and Linux on version tags
 
 ## Development
 
