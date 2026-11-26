@@ -5,3 +5,9 @@ You may view this material for evaluation purposes only. No part of this
 repository may be copied, modified, distributed, sublicensed, or used,
 commercially or otherwise, without the prior written permission of
 A Elite Estrangeira.
+
+Third-party components, including the vendored GLib source, retain
+their original licenses and copyright notices. The restrictions above
+apply to first-party material and do not override rights granted by
+those third-party licenses. See src-tauri/vendor/glib-0.18.5/LICENSE
+and src-tauri/vendor/glib-0.18.5/COPYRIGHT.

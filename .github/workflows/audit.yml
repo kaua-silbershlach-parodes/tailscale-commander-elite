@@ -58,6 +58,10 @@ jobs:
           toolchain: "1.100.0"
       - name: Verify exact GLib backport
         run: python3 tools/verify_glib_vendor.py
+      - name: Validate current dependency scope
+        run: |
+          python3 -m unittest discover -s tools -p test_dependency_scope.py
+          python3 tools/dependency_scope.py
       - name: RustSec dependency audit
         working-directory: src-tauri
         run: |

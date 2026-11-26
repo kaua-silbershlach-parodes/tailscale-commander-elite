@@ -1,4 +1,4 @@
-# Book 1 re-audit — local candidate
+# Book 1 re-audit — v1.2.2 review candidate
 
 This is a candidate, not release authorization. The scope is the existing desktop shell, signed updater, separate loopback health service, scripts and release pipeline. No new identity system, remote-control feature, or access policy has been invented.
 
@@ -24,7 +24,7 @@ This is a candidate, not release authorization. The scope is the existing deskto
 
 Release authorization: PENDING
 
-Do not mark Book 1 closed until the final tree is inventoried and read, all applicable findings are remediated or formally accepted, native tests/builds pass, both supported platforms are validated, the signed release is verified, and the decision is recorded. Do not weaken the security gate by suppressing unresolved advisories. The local candidate is not a production install or published release.
+Do not mark Book 1 closed until the final tree is inventoried and read, all applicable findings are remediated or formally accepted, native tests/builds pass, both supported platforms are validated, the signed release is verified, and the decision is recorded. Do not weaken the security gate by suppressing unresolved advisories. The review candidate is not a production install or published release.
 
 Every subsequent change must re-inventory all project files, verify the full tree and rerun the applicable controls and tests. The original repository and currently installed application remain unchanged until separately authorized.
 
@@ -43,7 +43,7 @@ The source was reopened and its eighteen-page text retrieved. Pages 1-4 identify
 
 The review branch runs Windows and Linux builds and tests without production signing secrets. It does not create release assets or publish a release. Dependency findings remain visible and require resolution or formal owner acceptance. No test job is a certification of a production deployment.
 
-The post-update OSV query covered 493 external package entries; the cookie advisory no longer appeared after the update to 0.18.3. Three flagged packages remain (glib, chrono, proc-macro-error). The tag workflow now fails closed before any signing job unless the recorded authorization and checklist are complete and the dependency audit passes. This guard is not itself approval.
+The post-update OSV query covered 493 external package entries; the cookie advisory no longer appeared after the update to 0.18.3. At that historical checkpoint three flagged packages remained (glib, chrono, proc-macro-error). The tag workflow now fails closed before any signing job unless the recorded authorization and checklist are complete and the dependency audit passes. This guard is not itself approval.
 
 ## CI verifier provisioning
 
@@ -54,5 +54,15 @@ Ubuntu 22.04 did not provide minisign via apt in candidate runs 45885601248 and 
 - The latest stable Tauri v2.12.7 still uses GTK3 and the GLib 0.18 dependency family. A Cargo update dry run did not offer updates resolving these three advisories. Tauri's own audit configuration for this tag acknowledges the GLib and proc-macro-error limitations.
 - RUSTSEC-2024-0429: the upstream fix is [gtk-rs/gtk-rs-core PR 1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), merge 05dff0ee696f9bcd8617cd48c4b812d046d440cb. The original crates.io GLib 0.18.5 archive is pinned by SHA-256, all 121 source files are reproduced byte-for-byte except the two upstream lines in src/variant_iter.rs, and upstream license and copyright are preserved. Cargo uses the local path override without misrepresenting its version. The exact vendor inventory and optimized Linux regression must pass; this is a local security backport, not an official patched release. Keep the advisory visible regardless of scanner treatment of path dependencies.
 - RUSTSEC-2026-0543: chrono 0.4.45 appears in Cargo.lock through optional serde_with dependency metadata. Cargo tree for both supported target triples reports no active reverse-dependency path with the project's current features. This is scope evidence, not automatic risk acceptance or a promise about future feature changes.
-- RUSTSEC-2024-0370: proc-macro-error 1.0.4 is active through GLib and GTK3 procedural macros on Linux at build time. It has no fixed published upgrade. The maintained replacement is not a drop-in upgrade of the existing GTK3 macro stack.
+- RUSTSEC-2024-0370: proc-macro-error 1.0.4 is active through GLib and GTK3 procedural macros on Linux at build time. It has no fixed published upgrade. A macro replacement is not a drop-in upgrade of the existing GTK3 macro stack; the alternative must itself be audited and maintained.
 - Strict Cargo Audit remains enabled, including warnings. No advisories are suppressed. Release authorization remains pending; the backport and scope evidence need validation and owner disposition of the remaining maintenance risks.
+
+## Verified follow-up and remaining decision
+
+Evidence at commit 37f6dff8035eec0e227e0fb1143affe1cf572ab4: both Windows and Linux platform jobs passed in GitHub Actions run 45888806546. Linux verified all 121 vendor files and executed the named optimized GLib iterator regression (1 passed); the regular Rust suite passed 5 Linux and 4 Windows tests. Cryptographic security job passed. Cargo Audit returned exit 1 for two denied unmaintained warnings: chrono and proc-macro-error. No unresolved GLib registry warning was reported because of the local path override; the original advisory and backport remain tracked.
+
+The new dependency scope check uses Cargo tree with locked normal, build and dev edges for both target triples. Chrono is present in Cargo metadata and the lockfile but absent from the current build trees; this distinction is not a waiver or a claim that future builds cannot activate it. proc-macro-error appears only in the Linux tree; Cargo metadata shows direct parents glib-macros and gtk3-macros with procedural macro targets. The scope tool fails on a change in those assumptions and is tested with six regression cases. Strict Cargo Audit is still separately required.
+
+No official compatible fixed release of either remaining crate was identified. Removing optional dependency records solely to silence a scanner or inventing an unmaintained local macro fork is not remediation. Track upstream maintenance/migration, review the build toolchain and feature activation, and do not publish while the strict audit gate is red. The owner must explicitly decide whether to accept a bounded temporary residual risk and authorize a documented change in release policy, or retain the current hold until upstream remediation. This document does not make that decision. The unauthenticated local health response likewise must not become an authorization signal.
+
+Review candidate README documents architecture, toolchain, commands, test evidence, dependency disposition, installation limits and license boundaries. No book titles, private key material, credentials or local machine paths are disclosed.

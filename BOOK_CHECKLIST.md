@@ -1,6 +1,6 @@
 # Tailscale Commander Elite - book checklist
 
-Source library: F-Society - Intel Books (1,146 books). One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
+Source library: private technical collection. One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
 
 - [ ] 1. Book 1 (historically applied through v1.2.1; reopened for independent validation, see SECURITY_AUDIT.md)
   - [x] Backend answers only `GET /health`
@@ -10,6 +10,12 @@ Source library: F-Society - Intel Books (1,146 books). One whole book at a time;
   - [x] Bounded request reads, per-connection workers, strict request-line and Host checks
   - [x] CSP and least-privilege capabilities in the shell
   - [x] Fail-closed workflow, scripts, and smoke tests
+  - [x] Signed-version enforcement and native updater regressions
+  - [x] Authenticated CI verifier provisioning and cross-platform builds (historical evidence)
+  - [x] GLib backport integrity and optimized Linux regression (historical evidence)
+  - [ ] Strict dependency audit: two upstream maintenance warnings remain
+  - [ ] Owner disposition of residual risks and release authorization
+  - [ ] Signed v1.2.2 bundles and isolated installation smoke test
 - [ ] 2. Book 2
 - [ ] 3. Book 3
 - [ ] 4. Book 4
