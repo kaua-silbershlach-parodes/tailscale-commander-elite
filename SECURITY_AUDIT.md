@@ -16,7 +16,7 @@ This is a candidate, not release authorization. The scope is the existing deskto
 | --- | --- |
 | Loopback health response is unauthenticated | Low sensitivity status only; never use as an authorization decision or proof of service identity. Record explicit risk acceptance before release; otherwise authenticate through a suitable local boundary. |
 | cookie 0.18.2 / RUSTSEC-2026-0594 | Updated by Cargo to 0.18.3; repeat Windows/Linux validation. The published advisory excludes Windows and requires specific fork/private-cookie behavior on Unix. |
-| glib 0.18.5 / RUSTSEC-2024-0429 | Transitive Tauri/GTK dependency for Linux; compatible upgrade to >=0.20 must be validated against the GTK chain. Do not force an ABI-incompatible substitution or silently ignore the advisory. |
+| glib 0.18.5 / RUSTSEC-2024-0429 | Local source backport of upstream PR 1343; Linux optimized regression and exact-source verification required. Track migration to upstream fixed >=0.20. Advisory remains recorded. |
 | chrono 0.4.45 / RUSTSEC-2026-0543 | Transitive dependency, maintenance warning; track upstream migration, document an approved temporary disposition if necessary. |
 | proc-macro-error 1.0.4 / RUSTSEC-2024-0370 | Transitive GTK build-time macro, maintenance warning; track upstream migration, document any approved temporary disposition. |
 
@@ -48,3 +48,11 @@ The post-update OSV query covered 493 external package entries; the cookie advis
 ## CI verifier provisioning
 
 Ubuntu 22.04 did not provide minisign via apt in candidate runs 45885601248 and 45886278580. The official Linux x86_64 minisign 0.12 archive is now authenticated using its pinned upstream Ed25519 public key, including the signed trusted comment; archive and executable SHA-256 are pinned. Only the exact executable is written to a new runner-local directory. Bootstrap regression tests are mandatory. Checkout v5 and upload-artifact v6 use Node 24 and remain commit-pinned. Dependency auditing is independent of signature provisioning and must still fail on unresolved advisories. No advisory is ignored and release authorization remains pending.
+
+## Dependency disposition and GLib backport candidate
+
+- The latest stable Tauri v2.12.7 still uses GTK3 and the GLib 0.18 dependency family. A Cargo update dry run did not offer updates resolving these three advisories. Tauri's own audit configuration for this tag acknowledges the GLib and proc-macro-error limitations.
+- RUSTSEC-2024-0429: the upstream fix is [gtk-rs/gtk-rs-core PR 1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), merge 05dff0ee696f9bcd8617cd48c4b812d046d440cb. The original crates.io GLib 0.18.5 archive is pinned by SHA-256, all 121 source files are reproduced byte-for-byte except the two upstream lines in src/variant_iter.rs, and upstream license and copyright are preserved. Cargo uses the local path override without misrepresenting its version. The exact vendor inventory and optimized Linux regression must pass; this is a local security backport, not an official patched release. Keep the advisory visible regardless of scanner treatment of path dependencies.
+- RUSTSEC-2026-0543: chrono 0.4.45 appears in Cargo.lock through optional serde_with dependency metadata. Cargo tree for both supported target triples reports no active reverse-dependency path with the project's current features. This is scope evidence, not automatic risk acceptance or a promise about future feature changes.
+- RUSTSEC-2024-0370: proc-macro-error 1.0.4 is active through GLib and GTK3 procedural macros on Linux at build time. It has no fixed published upgrade. The maintained replacement is not a drop-in upgrade of the existing GTK3 macro stack.
+- Strict Cargo Audit remains enabled, including warnings. No advisories are suppressed. Release authorization remains pending; the backport and scope evidence need validation and owner disposition of the remaining maintenance risks.

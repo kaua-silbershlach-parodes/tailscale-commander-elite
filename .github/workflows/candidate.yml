@@ -35,9 +35,19 @@ jobs:
         run: mix test
       - name: UI regression tests
         run: node --test tests/test_ui.cjs
+      - name: Verify exact GLib backport
+        if: runner.os == 'Linux'
+        run: python3 tools/verify_glib_vendor.py
       - name: Rust regression tests
         working-directory: src-tauri
         run: cargo test --locked
+      - name: Optimized GLib backport regression
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: |
+          set -o pipefail
+          cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact | tee "$RUNNER_TEMP/glib-backport-test.log"
+          grep -Fx 'test glib_variant_string_iterator_backport_regression ... ok' "$RUNNER_TEMP/glib-backport-test.log"
       - name: Unsigned executable build
         working-directory: src-tauri
         run: cargo build --release --locked

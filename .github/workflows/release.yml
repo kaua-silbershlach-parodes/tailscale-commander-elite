@@ -105,6 +105,14 @@ jobs:
         env:
           TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
         run: mix test
+      - name: Verify exact GLib backport
+        run: python3 tools/verify_glib_vendor.py
+      - name: Optimized GLib backport regression
+        working-directory: src-tauri
+        run: |
+          set -o pipefail
+          cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact | tee "$RUNNER_TEMP/glib-backport-test.log"
+          grep -Fx 'test glib_variant_string_iterator_backport_regression ... ok' "$RUNNER_TEMP/glib-backport-test.log"
       - name: Build Linux bundles
         working-directory: src-tauri
         run: cargo tauri build --bundles deb,appimage -- --locked

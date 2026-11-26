@@ -78,3 +78,19 @@ mod security_tests {
         assert!(mix.lines().any(|line| line.trim() == format!("version: \"{version}\",")));
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[test]
+fn glib_variant_string_iterator_backport_regression() {
+    use glib::{prelude::*, Variant};
+    let v = Variant::array_from_iter::<String>(
+        ["first", "second", "third", "fourth"].map(|s| s.to_variant())
+    );
+    let mut i = v.array_iter_str().unwrap();
+    assert_eq!(i.next(), Some("first"));
+    assert_eq!(i.next_back(), Some("fourth"));
+    assert_eq!(i.nth(0), Some("second"));
+    assert_eq!(i.nth_back(0), Some("third"));
+    assert_eq!(i.next(), None);
+    assert_eq!(v.array_iter_str().unwrap().last(), Some("fourth"));
+}
