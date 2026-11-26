@@ -1,21 +1,40 @@
-# Tailscale Commander Elite - desktop base by A Elite Estrangeira
-v1
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/857a2a55-e680-483b-bf2a-25439de3d094" />
+# Tailscale Commander Elite
 
-Tailscale Commander Elite is a desktop base built by A Elite Estrangeira on the Machinery template: a Tauri (Rust) shell with an Elixir/OTP backend sidecar and signed auto-updates.
+Tailscale Commander Elite is a desktop base by A Elite Estrangeira, built on the Machinery template with a Tauri 2 shell, an Elixir/OTP backend sidecar, and signed auto-updates.
 
 ## What is inside
 
-- Tauri 2 desktop app for Windows with an NSIS installer
+- Tauri 2 desktop app with Windows NSIS installer
+- Linux AppImage and .deb release bundles
 - Elixir/OTP backend sidecar with a local health endpoint on 127.0.0.1:45900
-- Signed auto-updates through the GitHub release feed (latest.json)
-- English interface with Updates and Backend panels
-- Hardened backend health endpoint (book 1 of BOOK_CHECKLIST.md): only GET /health is answered, every other route is denied by default, oversized requests are rejected
-- GitHub Actions release workflow building Windows and Linux on version tags
+- Signed auto-updates through the GitHub release feed (`latest.json`)
+- English interface with only the template Updates and Backend panels
+- GitHub Actions release workflow for Windows and Linux version tags
+
+## Done checklist
+
+- [x] Machinery desktop base applied
+- [x] Windows v1.0.0 release published
+- [x] Linux AppImage and .deb added to the release feed
+- [x] Book 1 read and reviewed by 4 readers
+- [x] Backend health endpoint hardened
+- [x] Release workflow fixed to install the Tauri CLI
+- [x] v1.1.1 published with Windows and Linux assets
+
+## Book improvements applied
+
+Book 1, *Planning for a Zero Trust Architecture*, was applied only where it hardens code that already exists in this project:
+
+- [x] Only `GET /health` is answered by the backend
+- [x] Unknown routes and non-GET methods are denied by default
+- [x] Oversized backend requests are rejected
+- [x] No invented identities, resources, rules, or interface panels are shipped
+
+The full book sequence is tracked in `BOOK_CHECKLIST.md`.
 
 ## Development
 
-Run the numbered scripts in `scripts/` to set up, build, and smoke-test the base. The backend compiles with `mix compile` inside `backend/`.
+Run the numbered scripts in `scripts/` to set up, build, and smoke-test the base. The backend compiles and tests with `mix test` inside `backend/`.
 
 ## License
 
