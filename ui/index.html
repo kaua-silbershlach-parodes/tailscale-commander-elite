@@ -29,19 +29,6 @@
     </section>
 
     <section class="card">
-      <h2>Zero Trust</h2>
-      <p class="state">Policy: <strong>default deny</strong> &middot; per-request decisions with reasons</p>
-      <p class="hint">Access simulator: identity, resource and port are
-      evaluated together; HIGH-impact resources require approver
-      step-up, and failed device posture quarantines the request.
-      Every decision is written to the audit log.</p>
-      <div class="actions">
-        <button id="btn-simulate">Run access simulation</button>
-      </div>
-      <pre id="zt-log" class="log"></pre>
-    </section>
-
-    <section class="card">
       <h2>Backend (Elixir sidecar)</h2>
       <p class="state">Skeleton: <strong>minimal OTP app included in <code>backend/</code></strong></p>
       <p class="hint">Following the NativeBeam architecture, the shell pairs

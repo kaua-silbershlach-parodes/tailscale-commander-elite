@@ -80,31 +80,6 @@ async function downloadAndInstall() {
   }
 }
 
-async function simulate() {
-  const log = el('zt-log');
-  const cases = [
-    { identity: 'stranger', resource: 'server', port: 443, posture_ok: true, approved: false },
-    { identity: 'operator', resource: 'server', port: 443, posture_ok: true, approved: false },
-    { identity: 'operator', resource: 'server', port: 443, posture_ok: false, approved: false },
-    { identity: 'admin', resource: 'server', port: 22, posture_ok: true, approved: false },
-  ];
-  log.textContent = '';
-  for (const c of cases) {
-    try {
-      const r = await fetch('http://127.0.0.1:45900/zero-trust/simulate', {
-        method: 'POST',
-        body: JSON.stringify(c),
-      });
-      const d = await r.json();
-      log.textContent += `${c.identity} -> ${c.resource}:${c.port} = ${d.decision} (${d.reasons.join('; ')})\n`;
-    } catch (err) {
-      log.textContent += `backend unreachable: ${err}\n`;
-      break;
-    }
-  }
-}
-
-el('btn-simulate').addEventListener('click', simulate);
 el('btn-check').addEventListener('click', checkNow);
 el('btn-download').addEventListener('click', downloadAndInstall);
 el('btn-restart').addEventListener('click', () => relaunch());

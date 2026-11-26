@@ -1,6 +1,6 @@
 [package]
 name = "tailscale-commander-elite"
-version = "1.1.0"
+version = "1.1.1"
 description = "Tailscale Commander Elite desktop base (Rust/Tauri + system WebView) with signed GitHub auto-updates and an Elixir sidecar slot, by A Elite Estrangeira."
 edition = "2021"
 
