@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
@@ -45,18 +45,34 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
           toolchain: "1.100.0"
       - name: Install signature verifier
-        run: sudo apt-get update && sudo apt-get install -y minisign python3-cryptography
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          /usr/bin/python3 -m unittest discover -s tools -p test_bootstrap_minisign.py
+          /usr/bin/python3 tools/bootstrap_minisign.py --bin-dir "$RUNNER_TEMP/tce-minisign"
+          "$RUNNER_TEMP/tce-minisign/minisign" -v
+          echo "$RUNNER_TEMP/tce-minisign" >> "$GITHUB_PATH"
       - name: Cryptographic regression tests
         run: /usr/bin/python3 -m unittest discover -s tools -p test_verify_release.py
       - name: Verify the currently published stable release
         run: /usr/bin/python3 tools/verify_release.py latest
+  dependencies:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
       - name: Dependency audit
         working-directory: src-tauri
         run: |

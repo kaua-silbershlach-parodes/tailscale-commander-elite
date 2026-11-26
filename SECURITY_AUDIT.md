@@ -44,3 +44,7 @@ The source was reopened and its eighteen-page text retrieved. Pages 1-4 identify
 The review branch runs Windows and Linux builds and tests without production signing secrets. It does not create release assets or publish a release. Dependency findings remain visible and require resolution or formal owner acceptance. No test job is a certification of a production deployment.
 
 The post-update OSV query covered 493 external package entries; the cookie advisory no longer appeared after the update to 0.18.3. Three flagged packages remain (glib, chrono, proc-macro-error). The tag workflow now fails closed before any signing job unless the recorded authorization and checklist are complete and the dependency audit passes. This guard is not itself approval.
+
+## CI verifier provisioning
+
+Ubuntu 22.04 did not provide minisign via apt in candidate runs 45885601248 and 45886278580. The official Linux x86_64 minisign 0.12 archive is now authenticated using its pinned upstream Ed25519 public key, including the signed trusted comment; archive and executable SHA-256 are pinned. Only the exact executable is written to a new runner-local directory. Bootstrap regression tests are mandatory. Checkout v5 and upload-artifact v6 use Node 24 and remain commit-pinned. Dependency auditing is independent of signature provisioning and must still fail on unresolved advisories. No advisory is ignored and release authorization remains pending.

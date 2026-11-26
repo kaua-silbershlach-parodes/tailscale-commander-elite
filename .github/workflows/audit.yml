@@ -15,15 +15,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
           toolchain: "1.100.0"
-      - name: RustSec dependency audit
-        working-directory: src-tauri
-        run: |
-          cargo install cargo-audit --version 0.23.0 --locked
-          cargo audit
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: '1.17'
@@ -40,8 +35,29 @@ jobs:
           mix=$(grep -m1 'version: "' backend/mix.exs | cut -d'"' -f2)
           test "$conf" = "$cargo" && test "$conf" = "$mix"
       - name: Install independent signature verifier
-        run: sudo apt-get update && sudo apt-get install -y minisign python3-cryptography
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          /usr/bin/python3 -m unittest discover -s tools -p test_bootstrap_minisign.py
+          /usr/bin/python3 tools/bootstrap_minisign.py --bin-dir "$RUNNER_TEMP/tce-minisign"
+          "$RUNNER_TEMP/tce-minisign/minisign" -v
+          echo "$RUNNER_TEMP/tce-minisign" >> "$GITHUB_PATH"
       - name: Verify published release and feed signatures
         run: |
           /usr/bin/python3 -m unittest discover -s tools -p test_verify_release.py
           /usr/bin/python3 tools/verify_release.py latest
+  dependencies:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: RustSec dependency audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit --deny warnings
