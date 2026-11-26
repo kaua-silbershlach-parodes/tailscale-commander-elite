@@ -62,11 +62,14 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
 & cargo tauri build --manifest-path (Join-Path $TauriDir 'Cargo.toml')
 $buildRc = $LASTEXITCODE
 Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
 if ($buildRc -ne 0) { throw "Build failed (cargo tauri exit $buildRc)." }
 
 $bundleDir = Join-Path $TauriDir 'target\release\bundle\nsis'
-$setup = Get-ChildItem $bundleDir -Filter '*setup*.exe' | Select-Object -First 1
-$sig = Get-ChildItem $bundleDir -Filter '*.sig' | Select-Object -First 1
-if (-not $setup -or -not $sig) { throw "Missing artifacts in $bundleDir (Setup or signature)." }
+$setup = Get-ChildItem $bundleDir -Filter "*$version*setup*.exe" | Select-Object -First 1
+if (-not $setup) { throw "Missing Setup for version $version in $bundleDir." }
+$sig = Get-Item "$($setup.FullName).sig" -ErrorAction SilentlyContinue
+if (-not $sig) { throw "Missing signature for $($setup.Name)." }
+$hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
 
-Write-Host "BUILD OK: $($setup.Name) + signature, in $bundleDir"
+Write-Host "BUILD OK: $($setup.Name) ($($setup.Length) bytes, SHA256 $hash) + signature, in $bundleDir"

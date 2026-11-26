@@ -20,6 +20,7 @@ Tailscale Commander Elite is a desktop base by A Elite Estrangeira, built on the
 - [x] Backend health endpoint hardened
 - [x] Release workflow fixed to install the Tauri CLI
 - [x] v1.1.1 published with Windows and Linux assets
+- [x] Whole project re-read against book 1; missed hardening applied in v1.2.0
 
 ## Book improvements applied
 
@@ -29,6 +30,12 @@ Book 1 was applied only where it hardens code that already exists in this projec
 - [x] Unknown routes and non-GET methods are denied by default
 - [x] Oversized backend requests are rejected
 - [x] No invented identities, resources, rules, or interface panels are shipped
+- [x] Backend reads requests with a bounded loop and serves each connection in its own bounded worker
+- [x] Malformed requests get 400, non-loopback Host is rejected, health responses are no-store
+- [x] Strict backend port parsing and diagnosable listen failures
+- [x] Real CSP, prototype freezing, and least-privilege window capabilities
+- [x] Release workflow: read-only permissions, version/secret checks, backend tests, complete signed artifacts
+- [x] Scripts and smoke tests fail closed: installer exit codes, paired signatures, backend health check
 
 The full book sequence is tracked in `BOOK_CHECKLIST.md`.
 

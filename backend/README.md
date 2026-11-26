@@ -1,17 +1,16 @@
-# Backend — Elixir sidecar
+# Backend - Elixir sidecar
 
-This template follows the architecture of the house's NativeBeam
-project: a small native shell (here, Rust + the system WebView)
-around a local **Elixir/BEAM backend** that does the real work.
+A small native shell (Rust + the system WebView) with a local
+**Elixir/BEAM backend** as a separate OTP application.
 
-This folder now carries a **minimal, working skeleton** — pure OTP,
+This folder carries a **minimal, working skeleton** - pure OTP,
 zero dependencies:
 
 | Path | Contents |
 |---|---|
-| `mix.exs` | The Mix project (`:tailscale_commander_elite_backend`, version 1.0.0, no deps) |
-| `lib/tailscale_commander_elite_backend/application.ex` | The OTP application: a supervisor with one child |
-| `lib/tailscale_commander_elite_backend/health_server.ex` | A supervised `:gen_tcp` HTTP health server on **127.0.0.1:45900** (port override: `TAILSCALE_COMMANDER_ELITE_BACKEND_PORT`) that answers any request with `{"status":"ok","service":"tailscale_commander_elite_backend","version":"1.0.0"}` |
+| `mix.exs` | The Mix project (`:tailscale_commander_elite_backend`, no deps) |
+| `lib/tailscale_commander_elite_backend/application.ex` | The OTP application: strict port parsing, one supervised child |
+| `lib/tailscale_commander_elite_backend/health_server.ex` | A supervised `:gen_tcp` HTTP health server on **127.0.0.1:45900** (port override: `TAILSCALE_COMMANDER_ELITE_BACKEND_PORT`) that answers only `GET /health` with `{"status":"ok","service":"tailscale_commander_elite_backend","version":"..."}`; malformed requests get 400, other valid requests 404, oversized requests 413 |
 
 Run it:
 
@@ -22,22 +21,22 @@ rem then, in another terminal:
 curl http://127.0.0.1:45900/health
 ```
 
-## The contract a real backend plugs into
+Test it:
 
-- The backend is an independent Elixir application (OTP),
-  packaged separately and placed beside the shell executable, or
-  started by the shell as a child process.
-- The shell and the backend talk over **localhost only**
-  (HTTP/WebSocket on 127.0.0.1). Nothing is exposed to the network
-  by the backend itself.
-- The backend owns its own lifecycle: the shell starts it, health-
-  checks it (the endpoint above), and restarts it when it dies —
-  the OTP supervision model applied across the process boundary.
+```text
+cd backend
+mix test
+```
+
+## The contract
+
+- The backend is an independent Elixir application (OTP) with its
+  own lifecycle and version. The current shell does not spawn,
+  restart, or bundle it; packaging and lifecycle management are
+  handled outside this folder.
+- The backend listens on **127.0.0.1 only** and implements HTTP
+  health checks only. There is no WebSocket server, no Erlang
+  distribution listener, and no hot-loading logic in this code.
 - Versioning is independent: the shell shows its own version in
   the Updates panel; the backend reports its version on its
   health endpoint.
-
-Why Elixir stays, even though the shell moved from C++ to Rust:
-the BEAM gives supervision, distribution between machines and hot
-loading of modules — the properties the platform design is built
-on. Rust replaces the native shell, not the brain.

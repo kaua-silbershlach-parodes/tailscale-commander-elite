@@ -1,41 +1,62 @@
-// Update driver for the blank template shell.
+// Update driver for the Tailscale Commander Elite shell.
 // Uses the global Tauri API (app.withGlobalTauri = true in tauri.conf.json):
 // no bundler and no npm packages are needed for the interface.
-const { getVersion } = window.__TAURI__.app;
-const { check } = window.__TAURI__.updater;
-const { relaunch } = window.__TAURI__.process;
+const tauri = window.__TAURI__ || {};
+const getVersion = tauri.app?.getVersion;
+const check = tauri.updater?.check;
+const relaunch = tauri.process?.relaunch;
 
 const el = (id) => document.getElementById(id);
 let pendingUpdate = null;
+
+function errText(err) {
+  return err?.message ?? String(err);
+}
 
 function setState(text) {
   el('upd-state').textContent = text;
 }
 
+function setProgress(percent) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  const bar = el('upd-bar');
+  bar.style.width = clamped + '%';
+  bar.setAttribute('aria-valuenow', String(clamped));
+}
+
 function logLine(text) {
   const log = el('upd-log');
   const time = new Date().toLocaleTimeString();
-  log.textContent += `[${time}] ${text}\n`;
+  const lines = (log.textContent + `[${time}] ${text}\n`).split('\n');
+  log.textContent = lines.slice(-50).join('\n');
   log.scrollTop = log.scrollHeight;
 }
 
 async function init() {
+  if (!getVersion || !check || !relaunch) {
+    setState('unavailable');
+    logLine('Tauri API unavailable in this context.');
+    el('btn-check').disabled = true;
+    return;
+  }
   try {
     el('version').textContent = 'v' + (await getVersion());
   } catch (err) {
-    logLine('Could not read the app version: ' + err);
+    logLine('Could not read the app version: ' + errText(err));
   }
 }
 
 async function checkNow() {
   el('btn-check').disabled = true;
+  el('btn-download').disabled = true;
+  pendingUpdate = null;
+  setProgress(0);
   setState('checking...');
   try {
     const update = await check();
     if (!update) {
       setState('up to date');
       logLine('No update available. You are on the newest version.');
-      el('btn-check').disabled = false;
       return;
     }
     pendingUpdate = update;
@@ -44,7 +65,8 @@ async function checkNow() {
     el('btn-download').disabled = false;
   } catch (err) {
     setState('check failed');
-    logLine('Update check failed: ' + err);
+    logLine('Update check failed: ' + errText(err));
+  } finally {
     el('btn-check').disabled = false;
   }
 }
@@ -52,21 +74,23 @@ async function checkNow() {
 async function downloadAndInstall() {
   if (!pendingUpdate) return;
   el('btn-download').disabled = true;
+  el('btn-check').disabled = true;
+  setProgress(0);
   setState('downloading...');
   let downloaded = 0;
   let total = 0;
   try {
     await pendingUpdate.downloadAndInstall((event) => {
       if (event.event === 'Started') {
-        total = event.data.contentLength || 0;
+        total = Number(event.data.contentLength) || 0;
         logLine(`Download started (${total} bytes).`);
       } else if (event.event === 'Progress') {
-        downloaded += event.data.chunkLength;
+        downloaded += Number(event.data.chunkLength) || 0;
         if (total > 0) {
-          el('upd-bar').style.width = Math.round((downloaded / total) * 100) + '%';
+          setProgress((downloaded / total) * 100);
         }
       } else if (event.event === 'Finished') {
-        el('upd-bar').style.width = '100%';
+        setProgress(100);
         logLine('Download finished.');
       }
     });
@@ -75,12 +99,20 @@ async function downloadAndInstall() {
     el('btn-restart').classList.remove('hidden');
   } catch (err) {
     setState('install failed');
-    logLine('Download/install failed: ' + err);
+    logLine('Download/install failed: ' + errText(err));
     el('btn-download').disabled = false;
+  } finally {
+    el('btn-check').disabled = false;
   }
 }
 
 el('btn-check').addEventListener('click', checkNow);
 el('btn-download').addEventListener('click', downloadAndInstall);
-el('btn-restart').addEventListener('click', () => relaunch());
+el('btn-restart').addEventListener('click', async () => {
+  try {
+    await relaunch();
+  } catch (err) {
+    logLine('Restart failed: ' + errText(err));
+  }
+});
 init();

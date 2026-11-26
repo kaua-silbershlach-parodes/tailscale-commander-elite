@@ -1,18 +1,23 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let log_level = if cfg!(debug_assertions) {
+        log::LevelFilter::Info
+    } else {
+        log::LevelFilter::Warn
+    };
+
+    let result = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
-            Ok(())
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running the application");
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .level(log_level)
+                .build(),
+        )
+        .run(tauri::generate_context!());
+
+    if let Err(err) = result {
+        log::error!("error while running the application: {err}");
+        std::process::exit(1);
+    }
 }

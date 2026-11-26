@@ -18,23 +18,23 @@
 
     <section class="card">
       <h2>Updates</h2>
-      <p class="state">State: <strong id="upd-state">idle</strong></p>
-      <div class="progress"><div id="upd-bar"></div></div>
+      <p class="state">State: <strong id="upd-state" aria-live="polite">idle</strong></p>
+      <div class="progress"><div id="upd-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
       <div class="actions">
-        <button id="btn-check">Check for updates</button>
-        <button id="btn-download" disabled>Download and install</button>
-        <button id="btn-restart" class="hidden">Restart to update</button>
+        <button type="button" id="btn-check">Check for updates</button>
+        <button type="button" id="btn-download" disabled>Download and install</button>
+        <button type="button" id="btn-restart" class="hidden">Restart to update</button>
       </div>
-      <pre id="upd-log" class="log"></pre>
+      <pre id="upd-log" class="log" aria-live="polite"></pre>
     </section>
 
     <section class="card">
       <h2>Backend (Elixir sidecar)</h2>
-      <p class="state">Skeleton: <strong>minimal OTP app included in <code>backend/</code></strong></p>
-      <p class="hint">Following the NativeBeam architecture, the shell pairs
-      with a local Elixir/BEAM sidecar. The template ships a working
-      zero-dependency skeleton with a health endpoint on
-      <code>127.0.0.1:45900</code> — see <code>backend/README.md</code>.</p>
+      <p class="state">Separate OTP app: <strong>included in <code>backend/</code></strong></p>
+      <p class="hint">The backend is a zero-dependency Elixir/OTP
+      application with its own lifecycle. When it is running, it
+      answers only <code>GET /health</code> on
+      <code>127.0.0.1:45900</code> - see <code>backend/README.md</code>.</p>
     </section>
   </main>
   <script src="app.js"></script>

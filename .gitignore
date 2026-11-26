@@ -7,12 +7,15 @@
 
 # Updater signing keys - NEVER commit a private key.
 *.key
-*.key.pub
 updater-private.key
 
 # Local tooling state
 /node_modules/
 .DS_Store
 
-# GPT Commander local edit backups
 *.bak-gptcommander
+.env*
+*.pem
+*.p12
+*.pfx
+*.log

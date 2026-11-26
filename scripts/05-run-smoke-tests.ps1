@@ -23,7 +23,7 @@ Write-Host "1. Install layout OK. Installed version: $installed"
 $feedUrl = 'https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json'
 $feedNote = 'not published yet'
 try {
-    $feed = Invoke-RestMethod -Uri $feedUrl
+    $feed = Invoke-RestMethod -Uri $feedUrl -TimeoutSec 30
     if (-not $feed.version) { throw 'manifest without a version' }
     $feedNote = "published, newest $($feed.version)"
     Write-Host "2. Update feed OK. Newest published version: $($feed.version)"
@@ -32,11 +32,19 @@ try {
 }
 
 Write-Host '3. Launching the app...'
-Start-Process $appExe
+$launched = Start-Process $appExe -PassThru
 Start-Sleep -Seconds 5
-$proc = Get-Process -Name 'tailscale-commander-elite' -ErrorAction SilentlyContinue | Select-Object -First 1
+$proc = Get-Process -Id $launched.Id -ErrorAction SilentlyContinue
 if (-not $proc) { throw 'The app process is not running after launch.' }
 Write-Host "   App running (PID $($proc.Id))."
+
+try {
+    $health = Invoke-RestMethod -Uri 'http://127.0.0.1:45900/health' -TimeoutSec 5
+    if ($health.service -ne 'tailscale_commander_elite_backend') { throw 'Unexpected backend service.' }
+    Write-Host "   Backend health OK (version $($health.version))."
+} catch {
+    Write-Host '   Backend not running (separate OTP app; health check skipped).'
+}
 
 $record = Join-Path ([Environment]::GetFolderPath('Desktop')) 'TAILSCALE-COMMANDER-ELITE-SMOKE-TEST.txt'
 @(

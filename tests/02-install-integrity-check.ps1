@@ -16,5 +16,6 @@ if (-not (Get-ChildItem $installDir -Filter 'uninstall*.exe')) { throw 'Missing:
 Write-Host 'OK: uninstaller'
 
 $version = (Get-Item $appExe).VersionInfo.FileVersion
+if (-not $version) { throw 'Installed exe has no readable FileVersion.' }
 Write-Host "Installed version: $version"
 Write-Host 'INTEGRITY CHECK OK'

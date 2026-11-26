@@ -1,12 +1,34 @@
 name: Release
+# Builds signed artifacts on version tags. Publishing the GitHub release
+# and latest.json is a separate, verified step.
+
+permissions:
+  contents: read
 on:
   push:
     tags: ["v*"]
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Check versions and signing secret
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'TAURI_SIGNING_PRIVATE_KEY secret is empty' }
+          $tag = $env:GITHUB_REF_NAME -replace '^v',''
+          $conf = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($tag -ne $conf) { throw "tag $tag != tauri.conf $conf" }
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Backend tests
+        working-directory: backend
+        run: mix test
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
@@ -22,6 +44,7 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*
   linux:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -31,6 +54,21 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev patchelf file
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
+      - name: Check versions and signing secret
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$TAURI_SIGNING_PRIVATE_KEY"
+          tag="${GITHUB_REF_NAME#v}"
+          conf=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          test "$tag" = "$conf"
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Backend tests
+        working-directory: backend
+        run: mix test
       - name: Build Linux bundles
         working-directory: src-tauri
         run: cargo tauri build --bundles deb,appimage
@@ -42,4 +80,6 @@ jobs:
           name: linux
           path: |
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/deb/*.deb.sig
             src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig

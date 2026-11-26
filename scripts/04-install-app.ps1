@@ -29,7 +29,8 @@ $setup = Get-ChildItem $BundleDir -Filter '*setup*.exe' |
 if (-not $setup) { throw 'No Setup.exe found. Run script 03 first.' }
 
 Write-Host "Installing silently: $($setup.FullName)"
-Start-Process $setup.FullName -ArgumentList '/S' -Wait
+$installer = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru
+if ($installer.ExitCode -ne 0) { throw "Installer failed (exit $($installer.ExitCode))." }
 
 $installDir = Join-Path $env:LOCALAPPDATA 'Tailscale Commander Elite'
 $appExe = Join-Path $installDir 'tailscale-commander-elite.exe'
@@ -40,4 +41,5 @@ while (-not (Test-Path $appExe)) {
 }
 
 $version = (Get-Item $appExe).VersionInfo.FileVersion
+if (-not $version) { throw 'Installed exe has no readable FileVersion.' }
 Write-Host "INSTALL OK: version $version at $installDir"
