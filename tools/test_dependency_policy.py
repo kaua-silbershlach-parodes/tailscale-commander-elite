@@ -8,7 +8,7 @@ class PolicyTests(unittest.TestCase):
         self.today=date(2026,11,27)
         self.report={'settings':{'ignore':[],'target_arch':[],'target_os':[],
             'severity':None,'informational_warnings':['notice','unmaintained','unsound']},
-            'database':{'advisory-count':1000,'last-commit':'abc'},
+            'database':{'advisory-count':1000,'last-commit':'a'*40},
             'lockfile':{'dependency-count':100},
             'vulnerabilities':{'found':False,'count':0,'list':[]},
             'warnings':{'unmaintained':[{'kind':'unmaintained','denied':True,
@@ -16,7 +16,7 @@ class PolicyTests(unittest.TestCase):
                 'advisory':{'id':identifier,'package':name,'informational':'unmaintained'}}
                 for identifier,(name,version) in p.APPROVED.items()]}}
     def check(self,code=1):
-        return p.evaluate(self.report,code,self.today)
+        return p.evaluate(self.report,code,self.today,"a"*40)
     def test_exact_approved(self):
         self.assertEqual(self.check(),sorted(p.APPROVED))
     def test_clean(self):
@@ -60,7 +60,7 @@ class PolicyTests(unittest.TestCase):
         self.report.pop('warnings')
         with self.assertRaises(KeyError): self.check()
 
-if __name__=='__main__': unittest.main()
+
 
 
 class LockPackageCountTests(unittest.TestCase):
@@ -73,3 +73,20 @@ class LockPackageCountTests(unittest.TestCase):
     def test_empty_rejected(self):
         with self.assertRaises(ValueError):
             p.lock_package_count(b'version = 4\n')
+
+class DatabaseEvidenceTests(unittest.TestCase):
+    setUp = PolicyTests.setUp
+    check = PolicyTests.check
+    def test_no_fetch_report(self):
+        self.report['database']['last-commit']=None
+        self.report['database']['last-updated']=None
+        self.assertEqual(self.check(),sorted(p.APPROVED))
+    def test_wrong_report_revision(self):
+        self.report['database']['last-commit']='b'*40
+        with self.assertRaises(ValueError): self.check()
+    def test_no_independent_revision(self):
+        self.report['database']['last-commit']=None
+        with self.assertRaises(ValueError):
+            p.evaluate(self.report,1,self.today,None)
+
+if __name__=='__main__': unittest.main()
