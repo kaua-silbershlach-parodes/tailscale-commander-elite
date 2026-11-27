@@ -16,9 +16,11 @@ Source library: private technical collection. One whole book at a time; each boo
   - [x] Shared release preflight and exact published-version check (fixture regression)
   - [x] Owner accepted only the two exact maintenance warnings temporarily, through 2026-12-26 UTC
   - [x] Dependency risk policy and complete required CI checks pass on integrated candidate (45938233677, 45938228506)
-  - [ ] Pre-signing assessment complete
-  - [ ] Owner disposition of residual risks and release authorization
+  - [x] Pre-signing assessment complete
+  - [x] Owner disposition of residual risks and release authorization
   - [x] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (both candidate runs passed)
+  - [ ] Full clean Windows development bootstrap/rollback (owner-authorized deferral; not passed)
+  - [ ] Full independent semantic reread (Book 1 closure; not certified by file hashes)
   - [ ] Production signed v1.2.2 bundles and isolated installation verification
 - [ ] 2. Book 2
 - [ ] 3. Book 3
