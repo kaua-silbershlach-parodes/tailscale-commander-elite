@@ -22,7 +22,7 @@ This is a candidate, not release authorization. The scope is the existing deskto
 
 ## Authorization gate
 
-Release authorization: APPROVED
+Release authorization: PENDING
 
 Do not mark Book 1 closed until the final tree is inventoried and read, all applicable findings are remediated or formally accepted, native tests/builds pass, both supported platforms are validated, the signed release is verified, and the decision is recorded. Do not weaken the security gate by suppressing unresolved advisories. The review candidate is not a production install or published release.
 
@@ -125,3 +125,7 @@ The second and third clean Sandbox runs both successfully installed WinGet, Git,
 ## Scoped pre-signing decision — 2026-11-27
 
 Owner explicitly authorized publication of v1.2.2 and deferral of the incomplete clean Windows development bootstrap/rollback. This is a scoped release assessment, not completion of Book 1 or certification of a clean installation. Both exact candidate runs 45961110724 and 45961059625 passed security, dependency policy, Windows ephemeral NSIS install/launch/uninstall and Linux signed candidate package checks. PR #3 was merged into protected main at 10d18969850c0642779ae2572a338d48cc3cf13d; identical reviewed Git tree verified. Native host regression on 022118749d73b4096a166cedd5f40afb155c700d: 53 Python, 7 JavaScript, 8 ExUnit, 4 Rust; 121 GLib vendor files, 193 tracked-file inventory and stable v1.2.1 signatures/feed verified. Reviewed runtime shell, updater configuration and capability boundaries, backend and UI logic, release scripts, verifier and production smoke workflow; no runtime code changed by bootstrap or this authorization. Previously accepted exact maintenance warnings and local health liveness risk retain their original scope and expiry. The full independent semantic reread of every file and full clean bootstrap remain pending; no claim of complete Book 1 assessment is made. Production signing is authorized only after the final protected-branch CI and tag workflow dependency gate; exact production bundle signatures, installer/liveness tests and independent release/feed verification remain mandatory. No key replacement, gate bypass or change to the feature branch is authorized.
+
+## v1.2.3 connectivity review
+
+Owner authorized recovering, testing, integrating and publishing the MCP feature on CTI. v1.2.2 was published and all three signatures and both feed entries were verified; its approval does not automatically approve v1.2.3. Only system_info and tailscale_status are exposed. No real credentials, machine identifiers, public tunnel endpoints, or runtime state are committed. Actual OpenAI connector interoperability is still pending. The release gate remains pending until the new scoped assessment and required checks are recorded.

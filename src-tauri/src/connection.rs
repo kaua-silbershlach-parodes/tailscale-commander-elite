@@ -126,7 +126,7 @@ pub fn connection_settings(window:tauri::WebviewWindow)->Result<Value,String>{
 #[tauri::command]
 pub fn connection_save(window:tauri::WebviewWindow,tunnel_id:String,api_key:String,state:tauri::State<'_,super::tunnel::TunnelState>)->Result<Value,String>{
     local(&window)?;
-    if state.active()?{return Err("Disconnect the tunnel before changing credentials".into())}
+    state.with_stopped(|| {
     if !valid_id(&tunnel_id){return Err("Invalid tunnel ID".into())}
     let key=if api_key.is_empty(){
         let old=native::read(TARGET)?.ok_or("Enter a runtime API key")?;
@@ -136,9 +136,10 @@ pub fn connection_save(window:tauri::WebviewWindow,tunnel_id:String,api_key:Stri
     if !valid_key(&key){return Err("Invalid runtime API key format".into())}
     native::write(TARGET,&json!({"schema":1,"tunnelId":tunnel_id,"apiKey":key}))?;
     connection_settings(window)
+    })
 }
 #[tauri::command]
-pub fn connection_clear(window:tauri::WebviewWindow,state:tauri::State<'_,super::tunnel::TunnelState>)->Result<(),String>{local(&window)?;state.stop()?;native::clear(TARGET)}
+pub fn connection_clear(window:tauri::WebviewWindow,state:tauri::State<'_,super::tunnel::TunnelState>)->Result<(),String>{local(&window)?;state.stop_then(||native::clear(TARGET))}
 pub(crate) fn network_snapshot()->Result<Value,String>{native::network()}
 pub(crate) fn saved_credentials()->Result<(String,String),String>{
     let r=native::read(TARGET)?.ok_or("Save protected settings first")?;

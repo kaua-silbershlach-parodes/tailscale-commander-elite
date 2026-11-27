@@ -7,7 +7,7 @@ root="$PWD"
 [[ ! -d src-tauri/target/release/bundle/deb && ! -d src-tauri/target/release/bundle/appimage ]]
 tmp=$(mktemp -d "${RUNNER_TEMP:?}/tce-linux-candidate.XXXXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
-cargo install tauri-cli --version 2.12.6 --locked
+[[ "$(cargo tauri --version)" == "tauri-cli 2.12.6" ]]
 (
   cd src-tauri
   cargo tauri signer generate --ci -w "$tmp/test.key"

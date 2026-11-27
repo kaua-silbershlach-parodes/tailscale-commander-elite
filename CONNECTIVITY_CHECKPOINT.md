@@ -45,7 +45,7 @@ Official documentation: https://developers.openai.com/api/docs/guides/secure-mcp
 
 ## Remaining gates
 
-Do not push or publish until native compile and tests, actual local UI, cross-process credential persistence, connection to OpenAI, ChatGPT connector discovery/calls, permission review, update regression, Ubuntu compatibility, full source re-review and candidate CI are evidenced. Do not reuse the earlier release authorization for this changed feature scope. No release of 1.2.2 or new version is implied by this checkpoint.
+A draft source-review branch may be uploaded with explicit owner authorization for CI, but do not publish production until native compile and tests, actual local UI, cross-process credential persistence, connection to OpenAI, ChatGPT connector discovery/calls, permission review, update regression, Ubuntu compatibility, scoped source re-review and candidate CI are evidenced. Do not reuse the earlier release authorization for this changed feature scope. No release of 1.2.2 or new version is implied by this checkpoint.
 
 ## Local evidence — first connectivity checkpoint
 
@@ -56,3 +56,11 @@ Do not push or publish until native compile and tests, actual local UI, cross-pr
 - The development window launched and the process remained alive. UI Automation did not locate the WebView controls; this is not an interactive UI pass. The development process was stopped.
 - The vault roundtrip used a synthetic credential and a separate test record that was removed afterward. Actual runtime key was not migrated; no outbound tunnel or ChatGPT connector call has been validated.
 - No push, merge, tag, release, installation over the existing application, or change to GPT Commander or the LinkedIn project.
+
+## v1.2.3 integration candidate
+
+Cherry-picked checkpoint onto verified v1.2.2 main. Windows installers will include the exact pinned official tunnel-client executable and upstream LICENSE, NOTICE, license inventory and SPDX sidecar, excluding the unused cloudflared binary. Source builds must provision resources before cargo. No runtime secret is bundled. The OpenAI runtime key is the tunnel key; a separate general API key is not required. The UI shows the panel first. Linux connectivity remains unsupported; Linux builds retain updater/backend. Live connector gates remain pending; this candidate is not a production release.
+
+Local integration: verified original official archive and packaged executable, LICENSE, NOTICE, license inventory and SPDX sidecar. 53 Python tests passed using the existing trusted minisign on PATH, 7 updater tests and 5 new UI fixture tests passed, 8 Elixir backend tests passed. First Python run lacked minisign on PATH; corrected without reinstalling. Native Rust validation remains to be recorded separately. No actual tunnel runtime key was entered, extracted, printed, or committed. Local UI fixture tests are not live connector verification.
+
+Native CTI regression passed: 10 Rust tests, 1 live device-specific test not run in this pass; locked debug build succeeded. Verified embedded Windows runtime resource hash. Actual WebView window launched and UI Automation found both edit controls and all six expected labels/buttons. No stable installation was changed; preview left open for owner local entry of the runtime key. Actual outbound tunnel and ChatGPT tool-call remain unverified. The candidate CI now provisions the official pinned Tauri CLI binaries instead of compiling them; both archive checks passed locally, and the existing Windows binary returned the exact version. Linux execution and signed package verification remain for hosted CI. This review branch triggers PR CI only, avoiding duplicate push/PR compilation. No private signing key accessed.

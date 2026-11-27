@@ -35,8 +35,8 @@ try {
     $env:Path = "$bin;$env:Path"
     $testConfig = $config
     if (-not $ProductionBundle) {
-        & cargo install tauri-cli --version 2.12.6 --locked
-        if ($LASTEXITCODE -ne 0) { throw 'Tauri CLI install failed.' }
+        $cliVersion = & cargo tauri --version
+        if ($LASTEXITCODE -ne 0 -or $cliVersion.Trim() -ne 'tauri-cli 2.12.6') { throw 'Verified Tauri CLI version required.' }
         $key = Join-Path $temp 'test.key'
         Push-Location $tauri
         try {
@@ -72,6 +72,9 @@ try {
         if ($signatureLock) { $signatureLock.Dispose() }
         $artifactLock.Dispose()
     }
+    $runtime = Get-Item -LiteralPath (Join-Path $install 'tunnel-runtime\tunnel-client.exe') -ErrorAction Stop
+    if ($runtime.Length -ne 26860544 -or (Get-FileHash -LiteralPath $runtime.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e0b2f25d08f24a4ddb7a04f3d43b62f88d4b18a5b20f2e478295cd8f353f21e5') { throw 'Installed MCP runtime integrity failed.' }
+    foreach ($notice in @('LICENSE','NOTICE','tunnel-client-v0.0.21-windows-amd64-licenses.txt','tunnel-client-v0.0.21-windows-amd64.spdx.json')) { if (-not (Test-Path -LiteralPath (Join-Path $runtime.DirectoryName $notice) -PathType Leaf)) { throw 'Missing MCP runtime notice.' } }
     $app = Get-Item -LiteralPath (Join-Path $install 'tailscale-commander-elite.exe') -ErrorAction Stop
     if ($app.VersionInfo.FileVersion -notin @($version,"$version.0")) { throw 'Installed version mismatch.' }
     $proc = Start-Process -FilePath $app.FullName -PassThru

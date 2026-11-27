@@ -72,6 +72,9 @@ if (-not $pubKey -or $confJson.plugins.updater.pubkey -ne $pubKey -or $pubKey -e
 
 $version = $null
 if ((Get-Content $Conf -Raw) -match '"version"\s*:\s*"([^"]+)"') { $version = $Matches[1] }
+& python (Join-Path $Project 'tools\bootstrap_tunnel_windows.py') --bundle --bin-dir (Join-Path $Project 'src-tauri\tunnel-runtime')
+if ($LASTEXITCODE -ne 0) { throw 'Verified tunnel runtime provisioning failed.' }
+
 Write-Host "Building version $version (cargo tauri build - this compiles the release binary)..."
 
 $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $KeyFile -Raw)

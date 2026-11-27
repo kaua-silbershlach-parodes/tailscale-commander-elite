@@ -34,10 +34,13 @@ jobs:
           TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
         run: mix test
       - name: UI regression tests
-        run: node --test tests/test_ui.cjs
+        run: node --test tests/test_ui.cjs tests/test_connection_ui.cjs
       - name: Verify exact GLib backport
         if: runner.os == 'Linux'
         run: python3 tools/verify_glib_vendor.py
+      - name: Provision verified official Windows MCP runtime
+        if: runner.os == 'Windows'
+        run: python tools/bootstrap_tunnel_windows.py --bundle --bin-dir src-tauri/tunnel-runtime
       - name: Rust regression tests
         working-directory: src-tauri
         run: cargo test --locked
@@ -51,6 +54,8 @@ jobs:
       - name: Unsigned executable build
         working-directory: src-tauri
         run: cargo build --release --locked
+      - name: Provision official verified Tauri CLI
+        run: python tools/bootstrap_tauri_cli.py
       - name: Signed NSIS candidate installation and uninstall smoke
         if: runner.os == 'Windows'
         shell: pwsh

@@ -39,6 +39,9 @@ if (Test-Path (Join-Path $Project '.git')) {
     if ($LASTEXITCODE -ne 0) { throw "git clone failed (exit $LASTEXITCODE)." }
 }
 
+& python (Join-Path $Project 'tools\bootstrap_tunnel_windows.py') --bundle --bin-dir (Join-Path $Project 'src-tauri\tunnel-runtime')
+if ($LASTEXITCODE -ne 0) { throw 'Verified tunnel runtime provisioning failed.' }
+
 Write-Host 'Type-checking the Rust shell (cargo check)...'
 & cargo check --locked --manifest-path (Join-Path $Project 'src-tauri\Cargo.toml')
 if ($LASTEXITCODE -ne 0) { throw "cargo check failed (exit $LASTEXITCODE)." }

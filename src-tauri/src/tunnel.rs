@@ -149,7 +149,7 @@ mod runtime{
     impl Drop for Run{fn drop(&mut self){let _=self.child.kill();let _=self.child.wait();}}
     impl Run{
         pub fn start(app:&tauri::AppHandle,id:&str,key:&str)->Result<Self,String>{
-            let exe:PathBuf=app.path().app_local_data_dir().map_err(|_|"Local app data unavailable")?.join("bin").join("tunnel-client.exe");
+            let exe:PathBuf=app.path().resource_dir().map_err(|_|"Resource directory unavailable")?.join("tunnel-runtime").join("tunnel-client.exe");
             let mut f=std::fs::OpenOptions::new().read(true).share_mode(1).open(&exe).map_err(|_|"Verified tunnel client not provisioned")?;
             let size=f.metadata().map_err(|_|"Tunnel client metadata unavailable")?.len();
             if size!=26860544{return Err("Tunnel executable size mismatch".into())}
@@ -203,7 +203,16 @@ mod runtime{
 #[derive(Default)]
 pub struct TunnelState(std::sync::Mutex<Option<runtime::Run>>);
 impl TunnelState{
-    pub fn active(&self)->Result<bool,String>{Ok(self.0.lock().map_err(|_|"Tunnel state unavailable")?.is_some())}
+    pub fn with_stopped<T>(&self, operation:impl FnOnce()->Result<T,String>)->Result<T,String>{
+        let guard=self.0.lock().map_err(|_|"Tunnel state unavailable")?;
+        if guard.is_some(){return Err("Disconnect the tunnel before changing credentials".into())}
+        operation()
+    }
+    pub fn stop_then<T>(&self, operation:impl FnOnce()->Result<T,String>)->Result<T,String>{
+        let mut guard=self.0.lock().map_err(|_|"Tunnel state unavailable")?;
+        drop(guard.take());
+        operation()
+    }
     pub fn stop(&self)->Result<(),String>{self.0.lock().map_err(|_|"Tunnel state unavailable")?.take();Ok(())}
 }
 #[tauri::command]

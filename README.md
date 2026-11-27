@@ -4,8 +4,8 @@ Desktop application foundation by A Elite Estrangeira. Built with Rust, Tauri 2,
 
 | Channel | Version | Status |
 |---|---|---|
-| Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Published |
-| [Security review](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/tree/review/book1-v1.2.2) | v1.2.2 | Candidate; scoped release authorized, signed publication pending |
+| Published stable | [v1.2.2](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.2) | Published and verified |
+| MCP connectivity review | v1.2.3 | Development candidate; live connector and production signing pending |
 
 **Scope:** This is the desktop foundation, not a functioning Tailscale network client, remote-control service, or complete enterprise Zero Trust architecture. No remote sessions, user authentication, VPN management or device enrollment are implemented by this version.
 
@@ -20,7 +20,7 @@ flowchart LR
   BE --> Health[GET /health]
 ```
 
-The desktop UI has two panels: Updates and Backend. The Backend panel is informational; it does not query, launch, authenticate or supervise the separate backend. The OTP application supervises its own TCP listener. The frontend uses no npm packages or bundler.
+The Windows candidate has four panels: OpenAI Secure MCP Tunnel, Updates, Backend, and Tailscale connection. The Backend panel is informational; it does not query, launch, authenticate or supervise the separate backend. The OTP application supervises its own TCP listener. The frontend uses no npm packages or bundler.
 
 | Component | Location | Responsibility |
 |---|---|---|
@@ -53,7 +53,7 @@ These are validated candidate configurations or explicitly configured packaging 
 Use an isolated checkout for development. Do not install a review build over a production installation. A trusted Git client, Rust toolchain and platform build dependencies are required.
 
 ```sh
-git clone --branch review/book1-v1.2.2 https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite.git
+git clone --branch review/mcp-v1.2.3 https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite.git
 cd tailscale-commander-elite
 rustup toolchain install 1.100.0 --profile minimal
 cd src-tauri
@@ -163,3 +163,7 @@ First-party code: Copyright 2026 A Elite Estrangeira. All rights reserved; see [
 ## Experimental connectivity checkpoint
 
 See [CONNECTIVITY_CHECKPOINT.md](CONNECTIVITY_CHECKPOINT.md) for the local feature branch scope, protected configuration, source tool mapping, and verification gates. The experimental changes are not a production release.
+
+## Secure MCP Tunnel (v1.2.3 development candidate)
+
+The public stable version is v1.2.2. The v1.2.3 candidate restores the Windows connectivity panel. Configure Tunnel ID and the OpenAI runtime API key locally, save in Windows Credential Manager, and explicitly connect. Only two read-only tools are available: system_info and tailscale_status. End-to-end ChatGPT connector validation is pending. Do not copy actual credentials into source or GitHub. For a source build on Windows, run python tools/bootstrap_tunnel_windows.py --bundle --bin-dir src-tauri/tunnel-runtime before Cargo; signed Windows bundles include the pinned client and its upstream notices. Linux connectivity is not implemented.

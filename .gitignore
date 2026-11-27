@@ -23,3 +23,6 @@ updater-private.key
 # Python audit tooling
 __pycache__/
 *.py[cod]
+
+# Verified official build-time runtime resource; never commit binaries.
+/src-tauri/tunnel-runtime/
