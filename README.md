@@ -142,13 +142,13 @@ The numbered scripts are for an explicitly authorized installation or release en
 
 | Script | Purpose |
 |---|---|
-| `01-install-prerequisites.ps1` | Installs platform/toolchain prerequisites, including user-level environment settings |
+| `01-install-prerequisites.ps1` | Provisions missing WinGet, Python and platform/toolchain prerequisites; uses hash-pinned official Windows x64 Tauri CLI |
 | `02-clone-and-check.ps1` | Checks out the configured repository, rejects dirty existing clones and validates build/backend |
 | `03-build-installer.ps1` | Requires recorded release approval, clean checkout, dependency risk policy and an existing restricted matching signing key; verifies the signed installer |
 | `04-install-app.ps1` | Requires recorded release approval and checks the exact installer and signature before per-user installation |
 | `05-run-smoke-tests.ps1` | Verifies installed version, exact published release version, launch and unauthenticated local backend liveness |
 
-Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
+Clean Windows Sandbox testing confirmed installation of WinGet, Git, Python, Visual Studio Build Tools, WebView2 and Rust. Full clean-machine bootstrap and rollback remain unverified. The official pinned Tauri CLI binary was verified on an existing Windows host. Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
 
 Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a passing dependency risk policy before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release. Candidate CI includes a separate Windows hosted-runner-only NSIS signing, signature verification, installation, launch and uninstall smoke test with a newly generated throwaway key. It does not access production signing material, upload test installers, install on an operator machine or prove a production release is signed. The exact published version still requires independent verification.
 
