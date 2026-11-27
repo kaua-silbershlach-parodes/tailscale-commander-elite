@@ -43,7 +43,7 @@ The source was reopened and its eighteen-page text retrieved. Pages 1-4 identify
 
 The review branch runs Windows and Linux builds and tests without production signing secrets. It does not create release assets or publish a release. Dependency findings remain visible and require resolution or formal owner acceptance. No test job is a certification of a production deployment.
 
-The post-update OSV query covered 493 external package entries; the cookie advisory no longer appeared after the update to 0.18.3. At that historical checkpoint three flagged packages remained (glib, chrono, proc-macro-error). The tag workflow now fails closed before any signing job unless the recorded authorization and checklist are complete and the dependency audit passes. This guard is not itself approval.
+The post-update OSV query covered 493 external package entries; the cookie advisory no longer appeared after the update to 0.18.3. At that historical checkpoint three flagged packages remained (glib, chrono, proc-macro-error). The tag workflow now fails closed before any signing job unless the recorded authorization and pre-signing assessment are complete and the dependency audit passes. This guard is not itself approval.
 
 ## CI verifier provisioning
 
@@ -66,3 +66,11 @@ The new dependency scope check uses Cargo tree with locked normal, build and dev
 No official compatible fixed release of either remaining crate was identified. Removing optional dependency records solely to silence a scanner or inventing an unmaintained local macro fork is not remediation. Track upstream maintenance/migration, review the build toolchain and feature activation, and do not publish while the strict audit gate is red. The owner must explicitly decide whether to accept a bounded temporary residual risk and authorize a documented change in release policy, or retain the current hold until upstream remediation. This document does not make that decision. The unauthenticated local health response likewise must not become an authorization signal.
 
 Review candidate README documents architecture, toolchain, commands, test evidence, dependency disposition, installation limits and license boundaries. No book titles, private key material, credentials or local machine paths are disclosed.
+
+## Release script follow-up
+
+The local signing script checks recorded approval, the Book 1 checklist, version consistency, a clean checkout and strict dependency auditing before inspecting signing key paths. It requires a separately provisioned matching restricted key and never generates a replacement key, rewrites the pinned public key or changes the key-directory ACL. The Tauri CLI runs from src-tauri with the NSIS target and locked Rust dependencies. Local installation checks recorded approval before executing any installer. Non-pre-release smoke verification requires the cryptographically verified published version to match the installed version. The local health response is reported only as unauthenticated liveness. The shared release preflight is covered by isolated fixture tests and used in CI. No production key or installation was exercised by this change.
+
+The remaining RUSTSEC-2026-0543 and RUSTSEC-2024-0370 findings are informational unmaintained advisories with no published patched versions. RUSTSEC-2026-0173 also marks proc-macro-error2 unmaintained. A migration of the GTK3 procedural macro stack to another maintained diagnostic API is not a compatible version bump. Strict audit remains enabled and approval remains pending.
+
+The pre-signing assessment is separate from final Book 1 closure to avoid a circular gate: complete and record the assessment and explicit owner authorization, then pass strict dependency audit before signing. After the signed bundles and exact published version are independently verified and the isolated installation check passes, record final Book 1 closure. Both approval markers remain pending in this candidate. This change does not waive any dependency advisory or accept residual risk.

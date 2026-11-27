@@ -127,7 +127,16 @@ def strict_json(raw):
     return json.loads(raw, object_pairs_hook=no_duplicates)
 
 
-def audit(config):
+def validate_release_version(tag, expected_version=None):
+    if not isinstance(tag, str) or not tag.startswith('v') or not VERSION.fullmatch(tag[1:]):
+        raise ValueError('invalid release tag')
+    version = tag[1:]
+    if expected_version is not None and (not VERSION.fullmatch(expected_version) or version != expected_version):
+        raise ValueError('Published release does not match expected version')
+    return version
+
+
+def audit(config, expected_version=None):
     with tempfile.TemporaryDirectory() as directory:
         d = pathlib.Path(directory)
         req = urllib.request.Request(API, headers={'User-Agent': 'TCE-release-audit', 'Accept': 'application/vnd.github+json'})
@@ -139,7 +148,7 @@ def audit(config):
         tag = release['tag_name']
         if not tag.startswith('v') or release.get('draft') or release.get('prerelease'):
             raise ValueError('unexpected release state')
-        version = tag[1:]
+        version = validate_release_version(tag, expected_version)
         artifacts = names(version)
         assets = {a['name']: a for a in release['assets']}
         if len(assets) != len(release['assets']):
@@ -174,12 +183,13 @@ def main():
     local = sub.add_parser('artifact')
     local.add_argument('file', type=pathlib.Path)
     local.add_argument('signature', type=pathlib.Path)
-    sub.add_parser('latest')
+    latest = sub.add_parser('latest')
+    latest.add_argument('--expected-version')
     args = parser.parse_args()
     if args.command == 'artifact':
         verify(args.file, args.signature.read_text(encoding='ascii'), args.config)
     else:
-        audit(args.config)
+        audit(args.config, args.expected_version)
 
 
 if __name__ == '__main__':

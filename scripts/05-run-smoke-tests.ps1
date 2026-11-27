@@ -39,7 +39,7 @@ try {
 }
 
 if (-not $PreRelease) {
-    & python (Join-Path $PSScriptRoot '..\tools\verify_release.py') latest
+    & python (Join-Path $PSScriptRoot '..\tools\verify_release.py') latest --expected-version $expected
     if ($LASTEXITCODE -ne 0) { throw 'Cryptographic release audit failed.' }
 }
 Write-Host '3. Launching the app...'
@@ -49,11 +49,11 @@ $proc = Get-Process -Id $launched.Id -ErrorAction SilentlyContinue
 if (-not $proc) { throw 'The app process is not running after launch.' }
 Write-Host "   App running (PID $($proc.Id))."
 
-$backendNote = 'not running (separate OTP app; health check skipped)'
+$backendNote = 'unverified local liveness only (not service identity)'
 try {
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:45900/health' -TimeoutSec 5
     if ($health.status -ne 'ok' -or $health.service -ne 'tailscale_commander_elite_backend' -or $health.version -ne $expected) { throw 'Unexpected backend health response.' }
-    $backendNote = "health OK (version $($health.version))"
+    $backendNote = "local liveness response matches version $($health.version); unauthenticated"
     Write-Host "   Backend health OK (version $($health.version))."
 } catch {
     throw "Mandatory backend health check failed: $_"

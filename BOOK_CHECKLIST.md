@@ -13,7 +13,9 @@ Source library: private technical collection. One whole book at a time; each boo
   - [x] Signed-version enforcement and native updater regressions
   - [x] Authenticated CI verifier provisioning and cross-platform builds (historical evidence)
   - [x] GLib backport integrity and optimized Linux regression (historical evidence)
+  - [x] Shared release preflight and exact published-version check (fixture regression)
   - [ ] Strict dependency audit: two upstream maintenance warnings remain
+  - [ ] Pre-signing assessment complete
   - [ ] Owner disposition of residual risks and release authorization
   - [ ] Signed v1.2.2 bundles and isolated installation smoke test
 - [ ] 2. Book 2

@@ -144,13 +144,13 @@ The numbered scripts are for an explicitly authorized installation or release en
 |---|---|
 | `01-install-prerequisites.ps1` | Installs platform/toolchain prerequisites, including user-level environment settings |
 | `02-clone-and-check.ps1` | Checks out the configured repository, rejects dirty existing clones and validates build/backend |
-| `03-build-installer.ps1` | Uses a matching local signing key and verifies the signed installer |
-| `04-install-app.ps1` | Checks the exact installer and signature before per-user installation |
-| `05-run-smoke-tests.ps1` | Verifies installed version, published feed, launch and separate backend health |
+| `03-build-installer.ps1` | Requires recorded release approval, clean checkout, strict audit and an existing restricted matching signing key; verifies the signed installer |
+| `04-install-app.ps1` | Requires recorded release approval and checks the exact installer and signature before per-user installation |
+| `05-run-smoke-tests.ps1` | Verifies installed version, exact published release version, launch and unauthenticated local backend liveness |
 
 Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
 
-Release CI requires recorded approval, a closed Book 1 checklist and a clean strict dependency audit before signing jobs. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release.
+Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a clean strict dependency audit before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release.
 
 ## Audit and development policy
 

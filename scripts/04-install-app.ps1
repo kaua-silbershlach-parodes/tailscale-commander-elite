@@ -24,6 +24,8 @@ $ErrorActionPreference = 'Stop'
 if (-not $WorkFolder) { $WorkFolder = "${Drive}:\TailscaleCommanderElite" }
 $Project = Join-Path $WorkFolder 'tailscale-commander-elite'
 $Conf = Join-Path $Project 'src-tauri\tauri.conf.json'
+& python (Join-Path $Project 'tools\release_preflight.py')
+if ($LASTEXITCODE -ne 0) { throw 'Release preflight failed; no installer executed.' }
 $expected = (Get-Content $Conf -Raw | ConvertFrom-Json).version
 $BundleDir = Join-Path $Project 'src-tauri\target\release\bundle\nsis'
 

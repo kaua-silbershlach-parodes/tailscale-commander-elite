@@ -17,8 +17,8 @@ jobs:
           persist-credentials: false
       - name: Require recorded release authorization
         run: |
-          grep -Fx 'Release authorization: APPROVED' SECURITY_AUDIT.md
-          grep -Eq '^- \[x\] 1\. Book 1 ' BOOK_CHECKLIST.md
+          python3 -m unittest discover -s tools -p test_release_preflight.py
+          python3 tools/release_preflight.py --tag "$GITHUB_REF_NAME"
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
           toolchain: "1.100.0"

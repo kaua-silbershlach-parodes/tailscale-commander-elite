@@ -54,4 +54,15 @@ class SignedVersionTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             v.verify(self.file,b64(raw),self.config,'1.2.3')
 
+class ReleaseVersionTests(unittest.TestCase):
+    def test_expected_published_version(self):
+        self.assertEqual(v.validate_release_version('v1.2.2', '1.2.2'), '1.2.2')
+    def test_old_published_release_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'expected version'):
+            v.validate_release_version('v1.2.1', '1.2.2')
+    def test_invalid_tag(self):
+        with self.assertRaisesRegex(ValueError, 'invalid release tag'):
+            v.validate_release_version('v1.2.2-preview')
+
+
 if __name__=='__main__': unittest.main()
