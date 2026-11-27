@@ -15,10 +15,10 @@ Source library: private technical collection. One whole book at a time; each boo
   - [x] GLib backport integrity and optimized Linux regression (historical evidence)
   - [x] Shared release preflight and exact published-version check (fixture regression)
   - [x] Owner accepted only the two exact maintenance warnings temporarily, through 2026-12-26 UTC
-  - [ ] Dependency risk policy and complete required CI checks pass on final candidate
+  - [x] Dependency risk policy and complete required CI checks pass on integrated candidate (45938233677, 45938228506)
   - [ ] Pre-signing assessment complete
   - [ ] Owner disposition of residual risks and release authorization
-  - [ ] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (CI result pending)
+  - [x] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (both candidate runs passed)
   - [ ] Production signed v1.2.2 bundles and isolated installation verification
 - [ ] 2. Book 2
 - [ ] 3. Book 3

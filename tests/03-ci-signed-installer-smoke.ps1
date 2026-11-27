@@ -1,5 +1,6 @@
-# Hosted-runner-only signed NSIS smoke test. Never uses production secrets.
-# Run AFTER unsigned tests/build. The checked-out config remains unchanged.
+# Hosted-runner-only NSIS smoke; no signing credentials in the test process.
+# Default uses an ephemeral key. ProductionBundle verifies the existing signed bundle.
+param([switch]$ProductionBundle)
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'This test is restricted to disposable GitHub-hosted Windows runners.'
@@ -18,9 +19,10 @@ if ($conf.productName -ne 'Tailscale Commander Elite' -or $conf.bundle.windows.n
 }
 $install = Join-Path $env:LOCALAPPDATA $conf.productName
 $bundle = Join-Path $tauri 'target\release\bundle\nsis'
-if ((Test-Path -LiteralPath $install) -or (Test-Path -LiteralPath $bundle)) {
-    throw 'Test requires a clean install and bundle directory.'
-}
+if (Test-Path -LiteralPath $install) { throw 'Test requires a clean install directory.' }
+if ($ProductionBundle) {
+    if (-not (Test-Path -LiteralPath $bundle -PathType Container)) { throw 'Missing production bundle.' }
+} elseif (Test-Path -LiteralPath $bundle) { throw 'Candidate requires a clean bundle directory.' }
 $temp = Join-Path $env:RUNNER_TEMP ('tce-install-test-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temp | Out-Null
 $originalPath = $env:Path
@@ -31,26 +33,29 @@ try {
     & python (Join-Path $repo 'tools\bootstrap_minisign_windows.py') --bin-dir $bin
     if ($LASTEXITCODE -ne 0) { throw 'Windows verifier provisioning failed.' }
     $env:Path = "$bin;$env:Path"
-    & cargo install tauri-cli --version 2.12.6 --locked
-    if ($LASTEXITCODE -ne 0) { throw 'Tauri CLI install failed.' }
-    $key = Join-Path $temp 'test.key'
-    Push-Location $tauri
-    try {
-        & cargo tauri signer generate --ci -w $key
-        if ($LASTEXITCODE -ne 0) { throw 'Ephemeral key generation failed.' }
-        $publicKey = (Get-Content -LiteralPath "$key.pub" -Raw).Trim()
-        if (-not $publicKey -or $publicKey -eq $conf.plugins.updater.pubkey) { throw 'Invalid ephemeral key.' }
-        $conf.plugins.updater.pubkey = $publicKey
-        $testConfig = Join-Path $temp 'candidate-config.json'
-        $conf | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $testConfig -Encoding utf8
-        $env:TAURI_SIGNING_PRIVATE_KEY = $key
-        $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
-        & cargo tauri build --ci --bundles nsis --config $testConfig -- --locked
-        if ($LASTEXITCODE -ne 0) { throw 'Ephemeral signed bundle build failed.' }
-    } finally {
-        Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
-        Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
-        Pop-Location
+    $testConfig = $config
+    if (-not $ProductionBundle) {
+        & cargo install tauri-cli --version 2.12.6 --locked
+        if ($LASTEXITCODE -ne 0) { throw 'Tauri CLI install failed.' }
+        $key = Join-Path $temp 'test.key'
+        Push-Location $tauri
+        try {
+            & cargo tauri signer generate --ci -w $key
+            if ($LASTEXITCODE -ne 0) { throw 'Ephemeral key generation failed.' }
+            $publicKey = (Get-Content -LiteralPath "$key.pub" -Raw).Trim()
+            if (-not $publicKey -or $publicKey -eq $conf.plugins.updater.pubkey) { throw 'Invalid ephemeral key.' }
+            $conf.plugins.updater.pubkey = $publicKey
+            $testConfig = Join-Path $temp 'candidate-config.json'
+            $conf | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $testConfig -Encoding utf8
+            $env:TAURI_SIGNING_PRIVATE_KEY = $key
+            $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
+            & cargo tauri build --ci --bundles nsis --config $testConfig -- --locked
+            if ($LASTEXITCODE -ne 0) { throw 'Ephemeral signed bundle build failed.' }
+        } finally {
+            Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+            Pop-Location
+        }
     }
     $setup = Get-Item -LiteralPath (Join-Path $bundle "Tailscale Commander Elite_$($version)_x64-setup.exe") -ErrorAction Stop
     $sig = Get-Item -LiteralPath "$($setup.FullName).sig" -ErrorAction Stop
@@ -59,7 +64,7 @@ try {
     try {
         $signatureLock = [IO.File]::Open($sig.FullName, 'Open', 'Read', 'Read')
         & python (Join-Path $repo 'tools\verify_release.py') --config $testConfig artifact $setup.FullName $sig.FullName
-        if ($LASTEXITCODE -ne 0) { throw 'Ephemeral installer signature rejected.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Installer signature rejected.' }
         $installedByTest = $true
         $installer = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
         if ($installer.ExitCode -ne 0) { throw "Installer exit $($installer.ExitCode)" }
@@ -72,7 +77,8 @@ try {
     $proc = Start-Process -FilePath $app.FullName -PassThru
     Start-Sleep -Seconds 10
     if (-not (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue)) { throw 'Installed application did not remain running.' }
-    Write-Output "SIGNED NSIS CANDIDATE SMOKE PASSED: $version (ephemeral key, not production)"
+    if ($ProductionBundle) { Write-Output "SIGNED PRODUCTION NSIS SMOKE PASSED: $version" }
+    else { Write-Output "SIGNED NSIS CANDIDATE SMOKE PASSED: $version (ephemeral key, not production)" }
 } finally {
     $env:Path = $originalPath
     try {
@@ -87,7 +93,7 @@ try {
             if ($u.ExitCode -ne 0 -or (Test-Path -LiteralPath (Join-Path $install 'tailscale-commander-elite.exe'))) {
                 throw 'Candidate uninstall failed.'
             }
-            Write-Output 'CANDIDATE UNINSTALL PASSED'
+            Write-Output 'NSIS UNINSTALL PASSED'
         }
     } finally {
         # The directory was created uniquely for this test and holds only test material.
