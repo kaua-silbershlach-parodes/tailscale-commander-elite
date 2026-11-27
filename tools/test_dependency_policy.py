@@ -61,3 +61,15 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(KeyError): self.check()
 
 if __name__=='__main__': unittest.main()
+
+
+class LockPackageCountTests(unittest.TestCase):
+    def test_canonical_headers(self):
+        self.assertEqual(p.lock_package_count(b'version = 4\n[[package]]\nname = "a"\n[[package]]\nname = "b"\n'), 2)
+
+    def test_crlf(self):
+        self.assertEqual(p.lock_package_count(b'[[package]]\r\nname = "a"\r\n'), 1)
+
+    def test_empty_rejected(self):
+        with self.assertRaises(ValueError):
+            p.lock_package_count(b'version = 4\n')

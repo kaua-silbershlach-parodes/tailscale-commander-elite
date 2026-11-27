@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
 import dependency_scope
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +55,20 @@ def evaluate(report, code, today):
     return sorted(accepted)
 
 
+
+def lock_package_count(lock_bytes):
+    """Count canonical Cargo-generated package headers; fail on empty input.
+
+    Cargo Audit independently parses the TOML lockfile. This is only a
+    cross-check of its reported package count, not a TOML parser.
+    Compatible with the Python 3.10 system interpreter on Ubuntu 22.04.
+    """
+    count = len(re.findall(rb'(?m)^\[\[package\]\]\r?$', lock_bytes))
+    if count == 0:
+        raise ValueError('No canonical Cargo lockfile package headers')
+    return count
+
+
 def main():
     # Refuse local audit configurations: no ignore rules, severity filters,
     # stale DB overrides or disabling yanked-package checks.
@@ -66,7 +79,7 @@ def main():
         raise ValueError('Existing cargo audit configuration; review before running unfiltered scan')
     lock = ROOT/'src-tauri/Cargo.lock'
     before = lock.read_bytes()
-    count = len(tomllib.loads(before.decode('utf-8'))['package'])
+    count = lock_package_count(before)
     scope = {target: dependency_scope.inspect(target) for target in dependency_scope.TARGETS}
     print(json.dumps(scope,indent=2),flush=True)
     dependency_scope.check_scope(scope)
