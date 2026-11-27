@@ -12,12 +12,17 @@
 #
 # Requires: script 04 completed (the app installed).
 
+param([switch]$PreRelease)
+
 $ErrorActionPreference = 'Stop'
 $installDir = Join-Path $env:LOCALAPPDATA 'Tailscale Commander Elite'
 $appExe = Join-Path $installDir 'tailscale-commander-elite.exe'
 
 if (-not (Test-Path $appExe)) { throw 'App exe missing. Run script 04 first.' }
+$confPath = Join-Path $PSScriptRoot '..\src-tauri\tauri.conf.json'
+$expected = (Get-Content -LiteralPath $confPath -Raw | ConvertFrom-Json).version
 $installed = (Get-Item $appExe).VersionInfo.FileVersion
+if ($installed -notin @($expected, "$expected.0")) { throw "Installed version $installed differs from expected $expected." }
 Write-Host "1. Install layout OK. Installed version: $installed"
 
 $feedUrl = 'https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json'
@@ -28,9 +33,15 @@ try {
     $feedNote = "published, newest $($feed.version)"
     Write-Host "2. Update feed OK. Newest published version: $($feed.version)"
 } catch {
-    Write-Host '2. Update feed: no signed release published yet (expected before the first release).'
+    if (-not $PreRelease) { throw "Mandatory update feed check failed: $_" }
+    $feedNote = 'NOT VERIFIED (explicit pre-release mode)'
+    Write-Warning $feedNote
 }
 
+if (-not $PreRelease) {
+    & python (Join-Path $PSScriptRoot '..\tools\verify_release.py') latest --expected-version $expected
+    if ($LASTEXITCODE -ne 0) { throw 'Cryptographic release audit failed.' }
+}
 Write-Host '3. Launching the app...'
 $launched = Start-Process $appExe -PassThru
 Start-Sleep -Seconds 5
@@ -38,14 +49,14 @@ $proc = Get-Process -Id $launched.Id -ErrorAction SilentlyContinue
 if (-not $proc) { throw 'The app process is not running after launch.' }
 Write-Host "   App running (PID $($proc.Id))."
 
-$backendNote = 'not running (separate OTP app; health check skipped)'
+$backendNote = 'unverified local liveness only (not service identity)'
 try {
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:45900/health' -TimeoutSec 5
-    if ($health.service -ne 'tailscale_commander_elite_backend') { throw 'Unexpected backend service.' }
-    $backendNote = "health OK (version $($health.version))"
+    if ($health.status -ne 'ok' -or $health.service -ne 'tailscale_commander_elite_backend' -or $health.version -ne $expected) { throw 'Unexpected backend health response.' }
+    $backendNote = "local liveness response matches version $($health.version); unauthenticated"
     Write-Host "   Backend health OK (version $($health.version))."
 } catch {
-    Write-Host '   Backend not running (separate OTP app; health check skipped).'
+    throw "Mandatory backend health check failed: $_"
 }
 
 $record = Join-Path ([Environment]::GetFolderPath('Desktop')) 'TAILSCALE-COMMANDER-ELITE-SMOKE-TEST.txt'
@@ -58,8 +69,8 @@ $record = Join-Path ([Environment]::GetFolderPath('Desktop')) 'TAILSCALE-COMMAND
     "Update feed: $feedNote"
     "Backend: $backendNote"
     "Feed: $feedUrl"
-    'Result: installed app, update feed availability and app launch verified.'
+    $(if ($PreRelease) { 'Result: PRE-RELEASE ONLY; update release not authorized.' } else { 'Result: installed version, feed signature verification, launch and backend version verified.' })
 ) | Set-Content -Path $record -Encoding ASCII
 Write-Host "4. Record written: $record"
 
-Write-Host 'SMOKE TESTS OK: installed app and updater checks completed.'
+if ($PreRelease) { Write-Warning 'PRE-RELEASE CHECK ONLY: not release authorization.' } else { Write-Host 'SMOKE TESTS OK: installed app, feed availability, launch, backend health verified.' }

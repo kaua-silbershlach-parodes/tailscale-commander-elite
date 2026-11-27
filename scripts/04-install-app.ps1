@@ -22,19 +22,35 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not $WorkFolder) { $WorkFolder = "${Drive}:\TailscaleCommanderElite" }
-$BundleDir = Join-Path $WorkFolder 'tailscale-commander-elite\src-tauri\target\release\bundle\nsis'
+$Project = Join-Path $WorkFolder 'tailscale-commander-elite'
+$Conf = Join-Path $Project 'src-tauri\tauri.conf.json'
+& python (Join-Path $Project 'tools\release_preflight.py')
+if ($LASTEXITCODE -ne 0) { throw 'Release preflight failed; no installer executed.' }
+$expected = (Get-Content $Conf -Raw | ConvertFrom-Json).version
+$BundleDir = Join-Path $Project 'src-tauri\target\release\bundle\nsis'
 
-$setup = Get-ChildItem $BundleDir -Filter '*setup*.exe' |
-         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($expected -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid expected version.' }
+$setup = Get-Item -LiteralPath (Join-Path $BundleDir "Tailscale Commander Elite_${expected}_x64-setup.exe") -ErrorAction Stop
 if (-not $setup) { throw 'No Setup.exe found. Run script 03 first.' }
 $sig = Get-Item "$($setup.FullName).sig" -ErrorAction SilentlyContinue
 if (-not $sig) { throw "Setup has no paired signature: $($setup.Name). Refusing to install." }
-$hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash
-Write-Host "Setup verified: paired signature present, SHA256 $hash"
-
-Write-Host "Installing silently: $($setup.FullName)"
-$installer = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru
-if ($installer.ExitCode -ne 0) { throw "Installer failed (exit $($installer.ExitCode))." }
+# Keep both verified files open without write/delete sharing until execution finishes.
+$artifactLock = [IO.File]::Open($setup.FullName, 'Open', 'Read', 'Read')
+$signatureLock = $null
+try {
+    $signatureLock = [IO.File]::Open($sig.FullName, 'Open', 'Read', 'Read')
+    & python (Join-Path $Project "tools\verify_release.py") --config $Conf artifact $setup.FullName $sig.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Installer signature verification failed." }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = [BitConverter]::ToString($sha.ComputeHash($artifactLock)).Replace('-', '').ToLower() }
+    finally { $sha.Dispose() }
+    Write-Host "Setup verified: cryptographic signature valid, SHA256 $hash"
+    $installer = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru
+    if ($installer.ExitCode -ne 0) { throw "Installer failed (exit $($installer.ExitCode))." }
+} finally {
+    if ($signatureLock) { $signatureLock.Dispose() }
+    $artifactLock.Dispose()
+}
 
 $installDir = Join-Path $env:LOCALAPPDATA 'Tailscale Commander Elite'
 $appExe = Join-Path $installDir 'tailscale-commander-elite.exe'
@@ -46,4 +62,5 @@ while (-not (Test-Path $appExe)) {
 
 $version = (Get-Item $appExe).VersionInfo.FileVersion
 if (-not $version) { throw 'Installed exe has no readable FileVersion.' }
+if ($version -notin @($expected, "$expected.0")) { throw "Installed version $version differs from $expected." }
 Write-Host "INSTALL OK: version $version at $installDir"

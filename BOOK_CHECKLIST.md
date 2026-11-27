@@ -1,8 +1,8 @@
 # Tailscale Commander Elite - book checklist
 
-Source library: F-Society - Intel Books (1,146 books). One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
+Source library: private technical collection. One whole book at a time; each book is read by 4 readers, only improvements that harden what already exists in the project are applied, and a new release is published before moving to the next book. Book titles are not published.
 
-- [x] 1. Book 1 (applied in v1.1.1, completed in v1.2.0 after a full project re-read)
+- [ ] 1. Book 1 (historically applied through v1.2.1; reopened for independent validation, see SECURITY_AUDIT.md)
   - [x] Backend answers only `GET /health`
   - [x] Unknown routes and non-GET methods are denied by default
   - [x] Oversized backend requests are rejected
@@ -10,6 +10,16 @@ Source library: F-Society - Intel Books (1,146 books). One whole book at a time;
   - [x] Bounded request reads, per-connection workers, strict request-line and Host checks
   - [x] CSP and least-privilege capabilities in the shell
   - [x] Fail-closed workflow, scripts, and smoke tests
+  - [x] Signed-version enforcement and native updater regressions
+  - [x] Authenticated CI verifier provisioning and cross-platform builds (historical evidence)
+  - [x] GLib backport integrity and optimized Linux regression (historical evidence)
+  - [x] Shared release preflight and exact published-version check (fixture regression)
+  - [x] Owner accepted only the two exact maintenance warnings temporarily, through 2026-12-26 UTC
+  - [ ] Dependency risk policy and complete required CI checks pass on final candidate
+  - [ ] Pre-signing assessment complete
+  - [ ] Owner disposition of residual risks and release authorization
+  - [ ] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (CI result pending)
+  - [ ] Production signed v1.2.2 bundles and isolated installation verification
 - [ ] 2. Book 2
 - [ ] 3. Book 3
 - [ ] 4. Book 4
@@ -66,7 +76,7 @@ anomaly logs) -> select (revisit controls when advisories,
 incidents, or failed checks appear) -> implement -> assess
 (tests and audits green) -> authorize (signed release only after
 every gate passes). Triggers: hold the release on any failed
-gate or advisory; supersede a vulnerable release with a patched
+gate or unapproved advisory; supersede a vulnerable release with a patched
 signed version, never replace assets silently; rotate the
 signing key on suspected compromise. Failure record: backend
 down means the health card cannot be verified and the separate

@@ -25,6 +25,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Drive -notmatch '^[A-Za-z]$') { throw 'Drive must be one drive letter.' }
+$downloadRoot = Join-Path $env:TEMP ('tce-prerequisites-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $downloadRoot -ErrorAction Stop | Out-Null
+try {
 
 $RustupHome = "${Drive}:\rust\rustup"
 $CargoHome = "${Drive}:\rust\cargo"
@@ -39,12 +43,28 @@ if ($LASTEXITCODE -ne 0) { throw "Build Tools install failed (winget exit $LASTE
 
 Write-Host 'Installing the WebView2 runtime...'
 & winget install --id Microsoft.EdgeWebView2Runtime -e --silent --accept-source-agreements --accept-package-agreements
-if ($LASTEXITCODE -ne 0) { Write-Host 'WebView2 runtime step returned nonzero (it is usually preinstalled on Windows 10/11). Continuing.' }
+if ($LASTEXITCODE -ne 0) {
+    # A failed installer is not proof that a runtime exists.
+    $roots = @(
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients',
+        'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients',
+        'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients'
+    )
+    $runtime = foreach ($root in $roots) {
+        if (Test-Path -LiteralPath $root) {
+            Get-ChildItem -LiteralPath $root | ForEach-Object {
+                $entry = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Stop
+                if ($entry.name -eq 'Microsoft Edge WebView2 Runtime' -and $entry.pv -and $entry.pv -ne '0.0.0.0') { $entry }
+            }
+        }
+    }
+    if (-not $runtime) { throw 'WebView2 runtime installation failed and no installed runtime was found.' }
+}
 
 $RustupUrl = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'
 $ExactSize = 12839424
 $ExactSha256 = '38027d51d69a5d05493627a0634dbea52d6cd793c8f072d2373d3f4163eec7db'
-$init = Join-Path $env:TEMP 'rustup-init.exe'
+$init = Join-Path $downloadRoot 'rustup-init.exe'
 if ((Test-Path $init) -and (Get-Item $init).Length -ne $ExactSize) { Remove-Item $init -Force }
 if (-not (Test-Path $init)) {
     Write-Host 'Downloading rustup-init.exe...'
@@ -61,7 +81,7 @@ Write-Host 'rustup-init verified: exact size and SHA256.'
 $env:RUSTUP_HOME = $RustupHome
 $env:CARGO_HOME = $CargoHome
 Write-Host "Installing Rust (stable, MSVC) into $RustupHome / $CargoHome ..."
-& $init -y --default-toolchain stable --profile minimal --no-modify-path
+& $init -y --default-toolchain 1.100.0 --profile minimal --no-modify-path
 if ($LASTEXITCODE -ne 0) { throw "rustup install failed (exit $LASTEXITCODE)." }
 
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -71,21 +91,22 @@ if ($userPath -notlike "*$CargoHome\bin*") {
 $env:Path = "$env:Path;$CargoHome\bin"
 
 $rustc = & rustc --version
+if ($LASTEXITCODE -ne 0) { throw 'rustc version check failed.' }
 $cargo = & cargo --version
+if ($LASTEXITCODE -ne 0) { throw 'cargo version check failed.' }
 Write-Host "Rust OK: $rustc | $cargo"
 
 Write-Host 'Installing the Tauri CLI (compiles from source, takes a few minutes)...'
-& cargo install tauri-cli --version '^2' --locked
+& cargo install tauri-cli --version 2.12.6 --locked
 if ($LASTEXITCODE -ne 0) { throw "tauri-cli install failed (exit $LASTEXITCODE)." }
 $tauri = & cargo tauri --version
+if ($LASTEXITCODE -ne 0) { throw 'Tauri CLI version check failed.' }
 Write-Host "Tauri CLI OK: $tauri"
 
 # --- Erlang/OTP 29.1.2 (the BEAM the Elixir backend runs on) ---
-# Erlang publishes hashes only for its source tarballs, not for the
-# Windows installer - so this gate is exact size + official host,
-# disclosed here and in the README.
+# Pin the official GitHub release asset SHA-256, exact size and Authenticode.
 $ErlDir = "${Drive}:\erlang"
-$ErlExe = Join-Path $env:TEMP 'otp_win64_29.1.2.exe'
+$ErlExe = Join-Path $downloadRoot 'otp_win64_29.1.2.exe'
 $ErlSize = 155770072
 if ((Test-Path $ErlExe) -and (Get-Item $ErlExe).Length -ne $ErlSize) { Remove-Item $ErlExe -Force }
 if (-not (Test-Path $ErlExe)) {
@@ -94,10 +115,14 @@ if (-not (Test-Path $ErlExe)) {
     if ($LASTEXITCODE -ne 0) { throw "Erlang download failed (curl exit $LASTEXITCODE)." }
 }
 if ((Get-Item $ErlExe).Length -ne $ErlSize) { throw 'Erlang installer size mismatch. Aborting.' }
+$ErlSha256 = '38297ee6fa8cafbc016cb187ebda30f7bdae85618415d9dbbbe413e9b9e27a4e'
+$erlHash = (certutil -hashfile $ErlExe SHA256 | Select-Object -Index 1).Trim().ToLower()
+if ($LASTEXITCODE -ne 0 -or $erlHash -ne $ErlSha256) { throw 'Erlang installer SHA256 mismatch.' }
 $sigStatus = (Get-AuthenticodeSignature $ErlExe).Status
 if ($sigStatus -ne 'Valid') { throw "Erlang installer Authenticode signature is $sigStatus. Aborting." }
 Write-Host 'Erlang installer verified: exact size, official host. Installing silently...'
-Start-Process $ErlExe -ArgumentList '/S', "/D=$ErlDir" -Wait
+$erlInstaller = Start-Process $ErlExe -ArgumentList '/S', "/D=$ErlDir" -Wait -PassThru
+if ($erlInstaller.ExitCode -ne 0) { throw "Erlang install failed ($($erlInstaller.ExitCode))." }
 $erlBin = $null
 $deadline = (Get-Date).AddSeconds(240)
 while (-not $erlBin) {
@@ -115,7 +140,7 @@ $otp = & erl -noshell -eval 'io:format("~s", [erlang:system_info(otp_release)]),
 Write-Host "Erlang OK: OTP $otp (bin at $erlBin)"
 
 # --- Elixir 1.20.5 (precompiled for OTP 29) ---
-$ExZip = Join-Path $env:TEMP 'elixir-otp-29.zip'
+$ExZip = Join-Path $downloadRoot 'elixir-otp-29.zip'
 $ExSize = 8643796
 $ExSha256 = 'f424d6f0bb710a1d4898f2645d8ad6cab3f5eab8d71848c0dda2579d3a8e8a06'
 if ((Test-Path $ExZip) -and (Get-Item $ExZip).Length -ne $ExSize) { Remove-Item $ExZip -Force }
@@ -129,16 +154,24 @@ $exSha = (certutil -hashfile $ExZip SHA256 | Select-Object -Index 1).Trim().ToLo
 if ($exSha -ne $ExSha256) { throw "Elixir zip SHA256 mismatch ($exSha). Aborting." }
 Write-Host 'Elixir zip verified: exact size and SHA256.'
 $ExDir = "${Drive}:\elixir"
-$staging = "${Drive}:\elixir-staging"
+$staging = Join-Path "${Drive}:\" ('elixir-staging-' + [Guid]::NewGuid().ToString('N'))
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $staging | Out-Null
 & tar.exe -xf $ExZip -C $staging
 if ($LASTEXITCODE -ne 0) { throw 'Elixir extraction failed.' }
 $bat = Get-ChildItem $staging -Recurse -Filter 'elixir.bat' | Select-Object -First 1
 if (-not $bat) { throw 'elixir.bat not found in the extracted zip.' }
-if (Test-Path $ExDir) { Remove-Item $ExDir -Recurse -Force }
-Move-Item $bat.Directory.Parent.FullName $ExDir
+$backup = $null
+if (Test-Path $ExDir) {
+    $backup = $ExDir + '.backup-' + [Guid]::NewGuid().ToString('N')
+    Move-Item $ExDir $backup
+}
+try { Move-Item $bat.Directory.Parent.FullName $ExDir } catch {
+    if ($backup -and -not (Test-Path $ExDir)) { Move-Item $backup $ExDir }
+    throw
+}
 Remove-Item $staging -Recurse -Force
+if ($backup) { Write-Host "Prior Elixir retained at $backup" }
 $exBin = Join-Path $ExDir 'bin'
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if ($userPath -notlike "*$exBin*") {
@@ -146,6 +179,11 @@ if ($userPath -notlike "*$exBin*") {
 }
 $env:Path = "$env:Path;$exBin"
 $exVer = & elixir --version
+if ($LASTEXITCODE -ne 0) { throw 'Elixir version check failed.' }
 Write-Host "Elixir OK: $($exVer | Select-Object -Last 1)"
 
 Write-Host 'PREREQUISITES OK: Git, Build Tools, WebView2, Rust, the Tauri CLI, Erlang/OTP and Elixir are installed.'
+} finally {
+    # Only delete the uniquely named temporary download directory created above.
+    if (Test-Path -LiteralPath $downloadRoot) { Remove-Item -LiteralPath $downloadRoot -Recurse -Force }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "tailscale-commander-elite"
-version = "1.2.1"
+version = "1.2.2"
 description = "Tailscale Commander Elite desktop base (Rust/Tauri + system WebView) with signed GitHub auto-updates and a separate Elixir backend slot, by A Elite Estrangeira."
 edition = "2021"
 
@@ -23,3 +23,11 @@ tauri-plugin-log = "2"
 lto = true
 codegen-units = 1
 strip = true
+
+# Linux GTK3 compatibility: upstream PR gtk-rs/gtk-rs-core#1343,
+# backported to the registry-authenticated glib 0.18.5 source.
+[patch.crates-io]
+glib = { path = "vendor/glib-0.18.5" }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+glib = "=0.18.5"

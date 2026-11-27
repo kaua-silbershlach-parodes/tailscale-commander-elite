@@ -1,0 +1,101 @@
+name: Book 1 candidate validation
+on:
+  push:
+    branches: [review/book1-v1.2.2]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev patchelf file
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Backend native tests
+        working-directory: backend
+        env:
+          TAILSCALE_COMMANDER_ELITE_BACKEND_PORT: "0"
+        run: mix test
+      - name: UI regression tests
+        run: node --test tests/test_ui.cjs
+      - name: Verify exact GLib backport
+        if: runner.os == 'Linux'
+        run: python3 tools/verify_glib_vendor.py
+      - name: Rust regression tests
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: Optimized GLib backport regression
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: |
+          set -o pipefail
+          cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact | tee "$RUNNER_TEMP/glib-backport-test.log"
+          grep -Fx 'test glib_variant_string_iterator_backport_regression ... ok' "$RUNNER_TEMP/glib-backport-test.log"
+      - name: Unsigned executable build
+        working-directory: src-tauri
+        run: cargo build --release --locked
+      - name: Signed NSIS candidate installation and uninstall smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/03-ci-signed-installer-smoke.ps1
+  security:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Install signature verifier
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          /usr/bin/python3 -m unittest discover -s tools -p test_bootstrap_minisign.py
+          /usr/bin/python3 tools/bootstrap_minisign.py --bin-dir "$RUNNER_TEMP/tce-minisign"
+          "$RUNNER_TEMP/tce-minisign/minisign" -v
+          echo "$RUNNER_TEMP/tce-minisign" >> "$GITHUB_PATH"
+      - name: Release preflight regression tests
+        run: /usr/bin/python3 -m unittest discover -s tools -p test_release_preflight.py
+      - name: Cryptographic regression tests
+        run: /usr/bin/python3 -m unittest discover -s tools -p test_verify_release.py
+      - name: Verify the currently published stable release
+        run: /usr/bin/python3 tools/verify_release.py latest
+  dependencies:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: "1.100.0"
+      - name: Validate current dependency scope
+        run: |
+          python3 -m unittest discover -s tools -p test_dependency_scope.py
+          python3 -m unittest discover -s tools -p test_dependency_policy.py
+          python3 tools/dependency_scope.py
+      - name: Dependency audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          python3 ../tools/dependency_policy.py

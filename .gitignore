@@ -19,3 +19,7 @@ updater-private.key
 *.p12
 *.pfx
 *.log
+
+# Python audit tooling
+__pycache__/
+*.py[cod]

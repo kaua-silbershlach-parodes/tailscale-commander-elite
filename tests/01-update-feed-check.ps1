@@ -32,4 +32,6 @@ if (Test-Path $appExe) {
     Write-Host 'App not installed on this machine (feed check only).'
 }
 
+& python (Join-Path $PSScriptRoot '..\tools\verify_release.py') latest
+if ($LASTEXITCODE -ne 0) { throw 'Cryptographic release audit failed.' }
 Write-Host 'FEED CHECK OK'

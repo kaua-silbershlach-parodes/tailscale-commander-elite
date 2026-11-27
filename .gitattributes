@@ -1,0 +1,2 @@
+# Preserve exact upstream vendor bytes across checkouts.
+src-tauri/vendor/glib-0.18.5/** -text
