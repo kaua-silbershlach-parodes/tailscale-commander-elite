@@ -3607,14 +3607,18 @@ dependencies = [
 name = "tailscale-commander-elite"
 version = "1.2.2"
 dependencies = [
+ "getrandom 0.4.3",
  "glib",
  "log",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -177,6 +177,90 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the connection_clear command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-connection-clear",
+          "markdownDescription": "Enables the connection_clear command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the connection_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-connection-save",
+          "markdownDescription": "Enables the connection_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the connection_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-connection-settings",
+          "markdownDescription": "Enables the connection_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the tailscale_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tailscale-status",
+          "markdownDescription": "Enables the tailscale_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the tunnel_start command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tunnel-start",
+          "markdownDescription": "Enables the tunnel_start command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the tunnel_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tunnel-status",
+          "markdownDescription": "Enables the tunnel_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the tunnel_stop command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tunnel-stop",
+          "markdownDescription": "Enables the tunnel_stop command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the connection_clear command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-connection-clear",
+          "markdownDescription": "Denies the connection_clear command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the connection_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-connection-save",
+          "markdownDescription": "Denies the connection_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the connection_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-connection-settings",
+          "markdownDescription": "Denies the connection_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tailscale_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tailscale-status",
+          "markdownDescription": "Denies the tailscale_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tunnel_start command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tunnel-start",
+          "markdownDescription": "Denies the tunnel_start command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tunnel_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tunnel-status",
+          "markdownDescription": "Denies the tunnel_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tunnel_stop command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tunnel-stop",
+          "markdownDescription": "Denies the tunnel_stop command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

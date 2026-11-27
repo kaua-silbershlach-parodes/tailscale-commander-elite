@@ -159,3 +159,7 @@ Book 1 remains open. Its applicable controls, risk register, historical evidence
 ## License
 
 First-party code: Copyright 2026 A Elite Estrangeira. All rights reserved; see [LICENSE](LICENSE). Third-party GLib source retains its original [license](src-tauri/vendor/glib-0.18.5/LICENSE) and [copyright notices](src-tauri/vendor/glib-0.18.5/COPYRIGHT).
+
+## Experimental connectivity checkpoint
+
+See [CONNECTIVITY_CHECKPOINT.md](CONNECTIVITY_CHECKPOINT.md) for the local feature branch scope, protected configuration, source tool mapping, and verification gates. The experimental changes are not a production release.

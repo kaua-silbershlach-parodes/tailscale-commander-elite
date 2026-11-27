@@ -36,7 +36,31 @@
       answers only <code>GET /health</code> on
       <code>127.0.0.1:45900</code> - see <code>backend/README.md</code>.</p>
     </section>
+    <section class="card">
+      <h2>Tailscale connection</h2>
+      <p id="ts-state" class="state" aria-live="polite">Not checked</p>
+      <dl class="connection-data"><dt>Hostname</dt><dd id="ts-host">—</dd>
+      <dt>MagicDNS</dt><dd id="ts-dns">—</dd>
+      <dt>Addresses</dt><dd id="ts-ips">—</dd></dl>
+      <button type="button" id="ts-refresh">Test local connection</button>
+    </section>
+    <section class="card">
+      <h2>OpenAI Secure MCP Tunnel</h2>
+      <label for="tunnel-id">Tunnel ID</label>
+      <input id="tunnel-id" maxlength="135" autocomplete="off" spellcheck="false">
+      <label for="tunnel-key">Runtime API key (never displayed after saving)</label>
+      <input id="tunnel-key" type="password" maxlength="515" autocomplete="off" spellcheck="false">
+      <p id="tunnel-state" class="state" aria-live="polite">Vault not checked</p>
+      <div class="actions"><button type="button" id="tunnel-save">Save protected settings</button>
+      <button type="button" id="tunnel-clear">Remove saved credentials</button></div>
+      <div class="actions"><button type="button" id="tunnel-connect">Connect MCP tunnel</button>
+      <button type="button" id="tunnel-disconnect">Disconnect</button>
+      <button type="button" id="tunnel-test">Test tunnel readiness</button></div>
+      <p id="tunnel-runtime" class="state" aria-live="polite">Stopped</p>
+      <p class="hint">Settings persist in the Windows credential vault. The tunnel starts only after local confirmation. Only system_info and tailscale_status are available to MCP; no remote filesystem, browser, or shell access.</p>
+    </section>
   </main>
   <script src="app.js"></script>
+  <script src="connection.js"></script>
 </body>
 </html>

@@ -1,3 +1,7 @@
+mod connection;
+mod tunnel;
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let log_level = if cfg!(debug_assertions) {
@@ -7,6 +11,9 @@ pub fn run() {
     };
 
     let result = tauri::Builder::default()
+        .manage(tunnel::TunnelState::default())
+        .invoke_handler(tauri::generate_handler![connection::connection_settings, connection::connection_save, connection::connection_clear, connection::tailscale_status, tunnel::tunnel_start, tunnel::tunnel_stop, tunnel::tunnel_status])
+        .on_window_event(|window,event|{if window.label()=="main" && matches!(event,tauri::WindowEvent::Destroyed){let _=window.state::<tunnel::TunnelState>().stop();}})
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(
@@ -63,7 +70,7 @@ mod security_tests {
         let c = config();
         let cap: Value = serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
         assert_eq!(cap["windows"], json!(["main"]));
-        assert_eq!(cap["permissions"], json!(["core:app:allow-version", "updater:default", "process:allow-restart"]));
+        assert_eq!(cap["permissions"], json!(["core:app:allow-version", "updater:default", "process:allow-restart", "allow-connection-settings", "allow-connection-save", "allow-connection-clear", "allow-tailscale-status", "allow-tunnel-start", "allow-tunnel-stop", "allow-tunnel-status"]));
         assert_eq!(c["app"]["windows"].as_array().unwrap().len(), 1);
         assert_eq!(c["app"]["windows"][0]["label"], "main");
         assert_eq!(c["bundle"]["windows"]["nsis"]["installMode"], "currentUser");

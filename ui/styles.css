@@ -110,3 +110,9 @@ button:focus-visible {
     animation: none !important;
   }
 }
+
+.connection-data { display: grid; grid-template-columns: 100px 1fr; gap: 8px; font-size: 13px; }
+.connection-data dt { color: var(--muted); }
+.connection-data dd { margin: 0; overflow-wrap: anywhere; }
+.card label { display: block; color: var(--muted); font-size: 13px; margin: 12px 0 5px; }
+.card input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }

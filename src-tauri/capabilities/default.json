@@ -1,11 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "description": "Default capability for the main window: app version read, signed updates, and process restart after an update.",
+  "description": "Main window: signed updates, restart, local vault and Tailscale status only.",
   "identifier": "default",
   "permissions": [
     "core:app:allow-version",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "allow-connection-settings",
+    "allow-connection-save",
+    "allow-connection-clear",
+    "allow-tailscale-status",
+    "allow-tunnel-start",
+    "allow-tunnel-stop",
+    "allow-tunnel-status"
   ],
   "windows": [
     "main"
