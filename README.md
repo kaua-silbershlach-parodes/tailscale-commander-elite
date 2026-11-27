@@ -104,7 +104,7 @@ python tools/dependency_scope.py
 python tools/verify_release.py latest
 ```
 
-Python signature tests require cryptography and a trusted minisign on PATH. The latest-release command verifies the currently published stable release, not the unsigned candidate. On Linux x86-64, `python tools/bootstrap_minisign.py --bin-dir /path/to/new/private/bin` authenticates the official 0.12 binary before installation; add that directory to PATH for the verification session. On Windows obtain the official x86-64 minisign binary, authenticate its archive with the upstream key, and place it on a trusted PATH. Never run an unverified verifier executable.
+Python signature tests require cryptography and a trusted minisign on PATH. The latest-release command verifies the currently published stable release, not the unsigned candidate. On Linux x86-64, `python tools/bootstrap_minisign.py --bin-dir /path/to/new/private/bin` authenticates the official 0.12 binary before installation; add that directory to PATH for the verification session. On Windows, run python tools/bootstrap_minisign_windows.py --bin-dir with a new private output directory; it checks the previously authenticated archive and executable SHA-256 pins before executing the verifier, then checks the upstream signature. Never run an unverified verifier executable.
 
 Backend tests use an ephemeral port: on PowerShell set `$env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT='0'`; on POSIX shells use `TAILSCALE_COMMANDER_ELITE_BACKEND_PORT=0 mix test` from `backend/`. Run `cargo test --locked` from `src-tauri/`; on Linux additionally run `cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact` and verify the named test actually ran.
 
@@ -121,7 +121,7 @@ Historical evidence at commit [`37f6dff`](https://github.com/kaua-silbershlach-p
 | Verifier bootstrap and signature tests | 6 + 7 passed |
 | Exact GLib backport and optimized Linux test | Passed |
 | Strict Cargo Audit | Failed on 2 maintenance warnings |
-| Candidate signed bundles and installation smoke test | Not authorized / not verified |
+| Candidate signed bundles and installation smoke test | Hosted Windows ephemeral-key test added; result pending |
 
 These results apply to the cited commit, not automatically to later changes. Review the [current candidate CI](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/workflows/candidate.yml) for the latest evidence.
 
@@ -150,7 +150,7 @@ The numbered scripts are for an explicitly authorized installation or release en
 
 Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
 
-Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a clean strict dependency audit before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release.
+Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a clean strict dependency audit before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release. Candidate CI includes a separate Windows hosted-runner-only NSIS signing, signature verification, installation, launch and uninstall smoke test with a newly generated throwaway key. It does not access production signing material, upload test installers, install on an operator machine or prove a production release is signed. The exact published version still requires independent verification.
 
 ## Audit and development policy
 

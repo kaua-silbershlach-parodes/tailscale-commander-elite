@@ -17,7 +17,8 @@ Source library: private technical collection. One whole book at a time; each boo
   - [ ] Strict dependency audit: two upstream maintenance warnings remain
   - [ ] Pre-signing assessment complete
   - [ ] Owner disposition of residual risks and release authorization
-  - [ ] Signed v1.2.2 bundles and isolated installation smoke test
+  - [ ] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (CI result pending)
+  - [ ] Production signed v1.2.2 bundles and isolated installation verification
 - [ ] 2. Book 2
 - [ ] 3. Book 3
 - [ ] 4. Book 4

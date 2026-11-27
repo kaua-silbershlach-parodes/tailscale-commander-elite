@@ -51,6 +51,10 @@ jobs:
       - name: Unsigned executable build
         working-directory: src-tauri
         run: cargo build --release --locked
+      - name: Signed NSIS candidate installation and uninstall smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/03-ci-signed-installer-smoke.ps1
   security:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
