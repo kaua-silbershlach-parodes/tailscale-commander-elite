@@ -1,7 +1,7 @@
 name: Book 1 candidate validation
 on:
   push:
-    branches: [review/book1-v1.2.2]
+    branches: [review/book1-v1.2.2, review/release-v1.2.2]
   pull_request:
     branches: [main]
 permissions:
@@ -55,6 +55,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./tests/03-ci-signed-installer-smoke.ps1
+      - name: Signed Linux candidate package and liveness smoke
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get install -y python3-cryptography xvfb xauth libfuse2
+          bash tests/05-ci-signed-linux-candidate.sh
   security:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
