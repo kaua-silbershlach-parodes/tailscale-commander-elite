@@ -80,3 +80,16 @@ The pre-signing assessment is separate from final Book 1 closure to avoid a circ
 The Windows platform job now includes a disposable GitHub-hosted runner test with an ephemeral signing key, the same candidate application version and per-user NSIS settings, and a temporary configuration overriding only the updater public key. It authenticates the Windows x64 minisign 0.12 executable using the independently verified archive and executable hashes, then checks the upstream archive signature. The test requires a clean install directory, verifies the signed installer and signed version before execution, holds read locks during installation, checks the installed file version, launches the application, checks process liveness, and uninstalls it. The test is restricted to GitHub-hosted Windows runners, refuses production signing variables, and does not publish or upload its artifacts. The local verifier provisioning and PowerShell syntax checks passed; hosted installation and uninstall results are pending at this checkpoint. This is not production signing, an authenticated backend identity check, a GUI interaction test, or final release authorization.
 
 The remaining maintenance advisories have no published compatible fixes; the GTK3 macro migration would require refactoring the upstream macro diagnostics and regression-testing the vendor stack, while chrono is absent from the current build trees. No vendor fork is introduced solely to remove advisory entries. The strict dependency gate and the open Book 1 status are unchanged.
+
+## Owner risk decision — 2026-11-27
+
+The owner explicitly authorized temporary acceptance of exactly the following two maintenance advisories and integration after all required checks pass:
+
+| ID | Exact package/version | Classification | Scope | Expiry (UTC, exclusive) |
+| --- | --- | --- | --- | --- |
+| RUSTSEC-2026-0543 | chrono 0.4.45 | Unmaintained | Lockfile only; absent in both current build trees | 2026-12-27 |
+| RUSTSEC-2024-0370 | proc-macro-error 1.0.4 | Unmaintained | Linux compile-time procedural macros only | 2026-12-27 |
+
+The 30-day expiry is a conservative review interval selected for this temporary acceptance. Both findings remain public, visible in the full unfiltered Cargo Audit JSON report, and unresolved upstream. They are informational maintenance risks, not confirmed exploitable vulnerabilities. This decision supersedes earlier statements requiring a completely warning-free audit; it does not supersede release authorization or other open findings.
+
+The new policy evaluator rejects all known vulnerabilities, any unapproved warning (including unsound, yanked, or notice), changes to either package/version/advisory type, expiry, filtered reports, scanner errors, inconsistent exit codes, and changed target scope. The raw scanner still denies warnings; only its verified complete report can satisfy the explicit temporary policy. Candidate, scheduled audit, release and local signing use the same gate. No scanner ignore flags or advisory database edits are used. Reassess immediately on any upstream fix, scope change or new advisory, and before expiry; do not automatically renew. No production signing or release is authorized by this decision. The loopback identity risk and final semantic review remain open.

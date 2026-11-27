@@ -134,7 +134,7 @@ These results apply to the cited commit, not automatically to later changes. Rev
 | RUSTSEC-2026-0543 (chrono) | Optional metadata/lockfile entry; absent from current Windows and Linux build trees; no fixed published upgrade |
 | RUSTSEC-2024-0370 (proc-macro-error) | Linux build-time procedural macro dependency; no fixed published upgrade |
 
-Dependency scope is checked independently from `cargo audit --deny warnings`. No advisory is suppressed. A passing scope check does not approve residual risk. The upstream GLib version remains 0.18.5; its absence from a registry-oriented scanner report is not an upstream fix.
+The unfiltered `cargo audit --json --deny warnings` report remains visible. On 2026-11-27 the owner accepted only the two exact maintenance warnings above, until 2026-12-27 UTC (exclusive). The policy gate verifies the report, exact IDs and versions, expiry and target scope; any vulnerability, other warning, scan failure or scope drift blocks the build. No scanner ignore flags are used. Run `python tools/dependency_policy.py` with cargo-audit 0.23.0 installed. See [SECURITY_AUDIT.md](SECURITY_AUDIT.md). The upstream GLib version remains 0.18.5; its absence from a registry-oriented scanner report is not an upstream fix.
 
 ## Windows installation and release operations
 
@@ -144,13 +144,13 @@ The numbered scripts are for an explicitly authorized installation or release en
 |---|---|
 | `01-install-prerequisites.ps1` | Installs platform/toolchain prerequisites, including user-level environment settings |
 | `02-clone-and-check.ps1` | Checks out the configured repository, rejects dirty existing clones and validates build/backend |
-| `03-build-installer.ps1` | Requires recorded release approval, clean checkout, strict audit and an existing restricted matching signing key; verifies the signed installer |
+| `03-build-installer.ps1` | Requires recorded release approval, clean checkout, dependency risk policy and an existing restricted matching signing key; verifies the signed installer |
 | `04-install-app.ps1` | Requires recorded release approval and checks the exact installer and signature before per-user installation |
 | `05-run-smoke-tests.ps1` | Verifies installed version, exact published release version, launch and unauthenticated local backend liveness |
 
 Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
 
-Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a clean strict dependency audit before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release. Candidate CI includes a separate Windows hosted-runner-only NSIS signing, signature verification, installation, launch and uninstall smoke test with a newly generated throwaway key. It does not access production signing material, upload test installers, install on an operator machine or prove a production release is signed. The exact published version still requires independent verification.
+Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a passing dependency risk policy before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release. Candidate CI includes a separate Windows hosted-runner-only NSIS signing, signature verification, installation, launch and uninstall smoke test with a newly generated throwaway key. It does not access production signing material, upload test installers, install on an operator machine or prove a production release is signed. The exact published version still requires independent verification.
 
 ## Audit and development policy
 

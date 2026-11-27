@@ -14,7 +14,8 @@ Source library: private technical collection. One whole book at a time; each boo
   - [x] Authenticated CI verifier provisioning and cross-platform builds (historical evidence)
   - [x] GLib backport integrity and optimized Linux regression (historical evidence)
   - [x] Shared release preflight and exact published-version check (fixture regression)
-  - [ ] Strict dependency audit: two upstream maintenance warnings remain
+  - [x] Owner accepted only the two exact maintenance warnings temporarily, through 2026-12-26 UTC
+  - [ ] Dependency risk policy and complete required CI checks pass on final candidate
   - [ ] Pre-signing assessment complete
   - [ ] Owner disposition of residual risks and release authorization
   - [ ] Hosted Windows ephemeral-key NSIS install, launch and uninstall smoke (CI result pending)
@@ -75,7 +76,7 @@ anomaly logs) -> select (revisit controls when advisories,
 incidents, or failed checks appear) -> implement -> assess
 (tests and audits green) -> authorize (signed release only after
 every gate passes). Triggers: hold the release on any failed
-gate or advisory; supersede a vulnerable release with a patched
+gate or unapproved advisory; supersede a vulnerable release with a patched
 signed version, never replace assets silently; rotate the
 signing key on suspected compromise. Failure record: backend
 down means the health card cannot be verified and the separate

@@ -36,8 +36,8 @@ $dirty = & git -C $Project status --porcelain
 if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Release checkout must be clean.' }
 Push-Location $TauriDir
 try {
-    & cargo audit --deny warnings
-    if ($LASTEXITCODE -ne 0) { throw 'Strict dependency audit failed; no signing key accessed.' }
+    & python (Join-Path $Project "tools\dependency_policy.py")
+    if ($LASTEXITCODE -ne 0) { throw 'Dependency risk policy failed; no signing key accessed.' }
 } finally { Pop-Location }
 Get-Command minisign -CommandType Application -ErrorAction Stop | Out-Null
 

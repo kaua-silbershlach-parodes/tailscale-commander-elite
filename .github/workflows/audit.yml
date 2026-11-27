@@ -61,9 +61,10 @@ jobs:
       - name: Validate current dependency scope
         run: |
           python3 -m unittest discover -s tools -p test_dependency_scope.py
+          python3 -m unittest discover -s tools -p test_dependency_policy.py
           python3 tools/dependency_scope.py
       - name: RustSec dependency audit
         working-directory: src-tauri
         run: |
           cargo install cargo-audit --version 0.23.0 --locked
-          cargo audit --deny warnings
+          python3 ../tools/dependency_policy.py
