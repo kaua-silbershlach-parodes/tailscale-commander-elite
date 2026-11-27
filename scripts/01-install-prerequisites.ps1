@@ -167,11 +167,35 @@ $cargo = & cargo --version
 if ($LASTEXITCODE -ne 0) { throw 'cargo version check failed.' }
 Write-Host "Rust OK: $rustc | $cargo"
 
-Write-Host 'Installing the Tauri CLI (compiles from source, takes a few minutes)...'
-& cargo install tauri-cli --version 2.12.6 --locked
-if ($LASTEXITCODE -ne 0) { throw "tauri-cli install failed (exit $LASTEXITCODE)." }
-$tauri = & cargo tauri --version
-if ($LASTEXITCODE -ne 0) { throw 'Tauri CLI version check failed.' }
+# Exact official Windows x64 CLI release; no source compilation required.
+Write-Host 'Provisioning pinned official Tauri CLI 2.12.6...'
+$cliZip = Join-Path $downloadRoot 'cargo-tauri-x86_64-pc-windows-msvc.zip'
+Get-PinnedFile 'https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.12.6/cargo-tauri-x86_64-pc-windows-msvc.zip' $cliZip 7939975 '39636fa68bc00f13dd610fb57688f292e93742978cc35395f2f1be7c540b88a1'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$cli = Join-Path $downloadRoot 'cargo-tauri.exe'
+$zip = [IO.Compression.ZipFile]::OpenRead($cliZip)
+try {
+    $entry = @($zip.Entries | Where-Object {$_.FullName -ceq 'cargo-tauri.exe'})
+    if ($entry.Count -ne 1 -or $entry[0].Length -ne 16191488) { throw 'Unexpected Tauri CLI archive member.' }
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($entry[0],$cli,$false)
+} finally { $zip.Dispose() }
+$cliSha = '003cab86f2a4efabdbb76cff6bc58524f9d1a3f9647cda1e6bee6812eebbb574'
+function Assert-TauriCliHash([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $actual = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant() }
+    finally { $sha.Dispose(); $stream.Dispose() }
+    if ($actual -ne $cliSha) { throw 'Tauri CLI executable SHA256 mismatch.' }
+}
+Assert-TauriCliHash $cli
+$cliDest = Join-Path $CargoHome 'bin\cargo-tauri.exe'
+if (Test-Path -LiteralPath $cliDest) {
+    Assert-TauriCliHash $cliDest
+} else {
+    [IO.File]::Copy($cli,$cliDest,$false)
+}
+$tauri = & $cliDest tauri --version
+if ($LASTEXITCODE -ne 0 -or $tauri -ne 'tauri-cli 2.12.6') { throw 'Tauri CLI version check failed.' }
 Write-Host "Tauri CLI OK: $tauri"
 
 # --- Erlang/OTP 29.1.2 (the BEAM the Elixir backend runs on) ---
@@ -208,6 +232,7 @@ if ($userPath -notlike "*$erlBin*") {
 }
 $env:Path = "$env:Path;$erlBin"
 $otp = & erl -noshell -eval 'io:format("~s", [erlang:system_info(otp_release)]), halt().'
+if ($LASTEXITCODE -ne 0 -or $otp -ne '29') { throw 'Erlang OTP version check failed.' }
 Write-Host "Erlang OK: OTP $otp (bin at $erlBin)"
 
 # --- Elixir 1.20.5 (precompiled for OTP 29) ---
