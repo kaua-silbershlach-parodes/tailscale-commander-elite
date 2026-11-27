@@ -5,7 +5,7 @@ Desktop application foundation by A Elite Estrangeira. Built with Rust, Tauri 2,
 | Channel | Version | Status |
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Published |
-| [Security review](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/tree/review/book1-v1.2.2) | v1.2.2 | Candidate; release authorization pending |
+| [Security review](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/tree/review/book1-v1.2.2) | v1.2.2 | Candidate; scoped release authorized, signed publication pending |
 
 **Scope:** This is the desktop foundation, not a functioning Tailscale network client, remote-control service, or complete enterprise Zero Trust architecture. No remote sessions, user authentication, VPN management or device enrollment are implemented by this version.
 
