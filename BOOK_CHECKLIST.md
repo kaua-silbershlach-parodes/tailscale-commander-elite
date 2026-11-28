@@ -98,7 +98,8 @@ Source library: private technical collection. One whole book at a time; each boo
   - CP23 review: no new runtime abstraction, public export, dependency, lifetime extension or vendor change. Existing borrowed contracts and Linux regression selector retained. Source review only; generic bounds and test behavior still need compiler and functional validation. No build, release or functional tests.
   - Book 8 reading coverage: complete for extracted text, 559/559 physical pages (542 text-bearing, 17 without extracted text). Visual inspection of figures and empty-text pages, independent semantic validation and integrated build/testing remain pending. Do not mark all implementation checks passed based on reading alone.
   - Next targeted reading cursor: page 560, offset 0 (end-of-file sentinel; no unread physical pages remain). End of source-only reading cycle; next phase is review/publication or authorized integrated validation.
-  - Source publication through CP23: main only, no version tag, build or release requested. Historical candidate CI does not validate these changes.
+  - Source publication through CP23: main only, initially no build or release. Historical candidate CI does not validate these changes.
+  - Owner subsequently authorized v1.2.3 release preparation; existing v1.2.2 tag retained. Full candidate CI on the tagged tree and strict release audit are required before production signing. New production verification and publication remain pending.
   - [ ] Build, test execution and independent assessment deferred; no release or book closure.
   - Owner-directed exception for this checkpoint: Book 1 remains open with its three existing pending items; no release required before this source-only work.
 

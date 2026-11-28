@@ -11,7 +11,7 @@ A security-oriented desktop application foundation built with the operating syst
 | Channel | Version | State |
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
-| Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
+| Integrated candidate | v1.2.3 | CP01–CP23; production signing and publication pending |
 | Next integrated build | In preparation | CP01–CP23 source changes on main; compilation and assessment pending |
 
 > **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP23. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
@@ -152,7 +152,7 @@ From another terminal: `curl http://127.0.0.1:45900/health`.
 Expected candidate response:
 
 ```json
-{"status":"ok","service":"tailscale_commander_elite_backend","version":"1.2.2"}
+{"status":"ok","service":"tailscale_commander_elite_backend","version":"1.2.3"}
 ```
 
 `TAILSCALE_COMMANDER_ELITE_BACKEND_PORT` overrides the default port 45900; 0 selects an ephemeral test port. See [backend documentation](backend/README.md).
@@ -209,7 +209,7 @@ The unfiltered strict audit remains visible. Only the two exact maintenance warn
 | `04-install-app.ps1` | Verify and install approved per-user artifact |
 | `05-run-smoke-tests.ps1` | Verify version, launch and backend liveness |
 
-Release signing requires recorded approval, completed pre-signing assessment and a passing dependency policy. Version tags trigger the gated release build; publishing signed bundles and the update feed is separate. Candidate CI uses disposable signing material for isolated smoke tests, not production keys. Full clean Windows bootstrap/rollback, independent semantic reread of the first reference and production signed v1.2.2 bundles with isolated installation verification remain open. Never commit signing keys, passwords, access tokens or private review artifacts.
+Release signing requires recorded approval, completed pre-signing assessment and a passing dependency policy. Version tags trigger the gated release build. The full candidate workflow, including both platform regression suites, disposable-key package smoke tests, signature verification and dependency checks, must pass on the tagged tree before either production signing job starts. Publishing verified signed bundles and the update feed remains separate. Candidate CI uses disposable signing material for isolated smoke tests, not production keys. Full clean Windows bootstrap/rollback, independent semantic reread of the first reference and production signed v1.2.2 bundles with isolated installation verification remain open. Never commit signing keys, passwords, access tokens or private review artifacts.
 
 ## Roadmap
 

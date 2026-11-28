@@ -1,5 +1,6 @@
 name: Book 1 candidate validation
 on:
+  workflow_call:
   push:
     branches: [review/book1-v1.2.2, review/release-v1.2.2]
   pull_request:

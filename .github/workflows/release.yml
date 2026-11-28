@@ -8,6 +8,8 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  candidate:
+    uses: ./.github/workflows/candidate.yml
   authorization:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
@@ -33,7 +35,7 @@ jobs:
           cargo install cargo-audit --version 0.23.0 --locked
           python3 ../tools/dependency_policy.py
   windows:
-    needs: authorization
+    needs: [authorization, candidate]
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -79,7 +81,7 @@ jobs:
           name: windows
           path: src-tauri/target/release/bundle/nsis/*
   linux:
-    needs: authorization
+    needs: [authorization, candidate]
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
