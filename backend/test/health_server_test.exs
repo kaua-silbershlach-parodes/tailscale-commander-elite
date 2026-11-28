@@ -113,7 +113,7 @@ defmodule TailscaleCommanderEliteBackend.HealthServerTest do
         try do
           :ok = :gen_tcp.send(socket, raw)
           response = receive_response(socket, 2_000)
-          assert String.starts_with?(response, "HTTP/1.1 #{status}\\r\\n")
+          assert String.starts_with?(response, "HTTP/1.1 #{status}\r\n")
           if status == "200 OK" do
             assert response =~ ~s("status":"ok")
           else
@@ -128,6 +128,44 @@ defmodule TailscaleCommanderEliteBackend.HealthServerTest do
 
     assert length(results) == 16
     assert Enum.all?(results, &(&1 == {:ok, :verified}))
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    exchange(p)
+  end
+
+  test "split request writes and response framing preserve the health contract" do
+    p = port()
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    {:ok, socket} = connect(p)
+    try do
+      :ok = :gen_tcp.send(socket, "GET /health HTTP/1.1\r\nHost: localhost:#{p}\r\n\r")
+      await_workers(1, System.monotonic_time(:millisecond) + 2_000)
+      assert {:error, :timeout} = :gen_tcp.recv(socket, 0, 100)
+      :ok = :gen_tcp.send(socket, "\n")
+      response = receive_response(socket, 2_000)
+      assert [head, body] = String.split(response, "\r\n\r\n", parts: 2)
+      assert [status | headers] = String.split(head, "\r\n")
+      assert status == "HTTP/1.1 200 OK"
+      assert "content-type: application/json" in headers
+      assert "content-length: #{byte_size(body)}" in headers
+      assert "cache-control: no-store" in headers
+      assert "connection: close" in headers
+      assert body =~ ~s("status":"ok")
+    after
+      :gen_tcp.close(socket)
+    end
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+  end
+
+  test "abandoned partial request releases its worker without stopping the listener" do
+    p = port()
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    {:ok, socket} = connect(p)
+    try do
+      :ok = :gen_tcp.send(socket, "GET /health HTTP/1.1\r\n")
+      await_workers(1, System.monotonic_time(:millisecond) + 2_000)
+    after
+      :gen_tcp.close(socket)
+    end
     await_workers(0, System.monotonic_time(:millisecond) + 2_000)
     exchange(p)
   end

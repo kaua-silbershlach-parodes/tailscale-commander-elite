@@ -23,6 +23,12 @@ serde_json = "1" # required by tauri::generate_context!
 log = "0.4"
 tauri-plugin-log = "2"
 
+# Surface unsafe code for review and require explicit blocks for unsafe operations
+# inside unsafe functions. These lints apply to this package, not dependencies.
+[lints.rust]
+unsafe_code = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
 [profile.release]
 lto = true
 codegen-units = 1

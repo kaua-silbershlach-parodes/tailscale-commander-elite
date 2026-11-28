@@ -105,15 +105,85 @@ mod security_tests {
         Ok(())
     }
 
+    const UPDATE_ENDPOINT: &str = "https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json";
+    const UPDATE_PUBLIC_KEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3QzUzM0U0MzNGOTBGRUMKUldUc0Qva3o1RFBGVis3T09GT21wKzNGbFo3Nm9mMkZjWEJ3cldlWGpkU2F1dDFqdHZpL2Nad04K";
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum UpdaterViolation {
+        Transport(&'static str),
+        SignedVersionRequired,
+        DowngradesNotDenied,
+        InvalidEndpoints,
+        InvalidPublicKey,
+    }
+
+    // Test-only source configuration guard; not a signature verifier.
+    fn validate_updater(updater: &Value) -> Result<(), UpdaterViolation> {
+        secure_transport_options(updater).map_err(UpdaterViolation::Transport)?;
+        match (updater.get("requireSignedVersion"), updater.get("allowDowngrades")) {
+            (Some(Value::Bool(true)), Some(Value::Bool(false))) => {}
+            (Some(Value::Bool(true)), _) => return Err(UpdaterViolation::DowngradesNotDenied),
+            _ => return Err(UpdaterViolation::SignedVersionRequired),
+        }
+        match updater.get("endpoints").and_then(Value::as_array).map(Vec::as_slice) {
+            Some([Value::String(endpoint)]) if endpoint.as_str() == UPDATE_ENDPOINT => {}
+            _ => return Err(UpdaterViolation::InvalidEndpoints),
+        }
+        match updater.get("pubkey") {
+            Some(Value::String(key)) if key.as_str() == UPDATE_PUBLIC_KEY => Ok(()),
+            _ => Err(UpdaterViolation::InvalidPublicKey),
+        }
+    }
+
     #[test]
     fn updater_requires_signed_versions_and_denies_downgrades() {
         let c = config();
-        let u = &c["plugins"]["updater"];
-        assert_eq!(u["requireSignedVersion"], true);
-        assert_eq!(u["allowDowngrades"], false);
-        assert_eq!(secure_transport_options(u), Ok(()));
-        assert_eq!(u["endpoints"], json!(["https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json"]));
-        assert_eq!(u["pubkey"], "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3QzUzM0U0MzNGOTBGRUMKUldUc0Qva3o1RFBGVis3T09GT21wKzNGbFo3Nm9mMkZjWEJ3cldlWGpkU2F1dDFqdHZpL2Nad04K");
+        assert_eq!(validate_updater(&c["plugins"]["updater"]), Ok(()));
+    }
+
+    #[test]
+    fn updater_policy_rejects_each_invalid_shape_or_value() {
+        use UpdaterViolation::*;
+        let baseline = json!({
+            "requireSignedVersion": true,
+            "allowDowngrades": false,
+            "endpoints": [UPDATE_ENDPOINT],
+            "pubkey": UPDATE_PUBLIC_KEY
+        });
+        assert_eq!(validate_updater(&baseline), Ok(()));
+        for (field, invalid, expected) in [
+            ("requireSignedVersion", json!(false), SignedVersionRequired),
+            ("requireSignedVersion", json!("true"), SignedVersionRequired),
+            ("requireSignedVersion", Value::Null, SignedVersionRequired),
+            ("allowDowngrades", json!(true), DowngradesNotDenied),
+            ("allowDowngrades", json!("false"), DowngradesNotDenied),
+            ("allowDowngrades", Value::Null, DowngradesNotDenied),
+            ("endpoints", json!(UPDATE_ENDPOINT), InvalidEndpoints),
+            ("endpoints", json!([]), InvalidEndpoints),
+            ("endpoints", json!([UPDATE_ENDPOINT, UPDATE_ENDPOINT]), InvalidEndpoints),
+            ("endpoints", json!([null]), InvalidEndpoints),
+            ("endpoints", json!(["http://example.invalid/latest.json"]), InvalidEndpoints),
+            ("endpoints", json!(["https://example.invalid/latest.json"]), InvalidEndpoints),
+            ("pubkey", json!(""), InvalidPublicKey),
+            ("pubkey", json!("different-public-key"), InvalidPublicKey),
+            ("pubkey", json!(123), InvalidPublicKey),
+            ("dangerousAcceptInvalidCerts", json!(true), Transport("dangerousAcceptInvalidCerts")),
+        ] {
+            let mut candidate = baseline.clone();
+            candidate[field] = invalid;
+            assert_eq!(validate_updater(&candidate), Err(expected), "invalid field: {field}");
+        }
+        for (field, expected) in [
+            ("requireSignedVersion", SignedVersionRequired),
+            ("allowDowngrades", DowngradesNotDenied),
+            ("endpoints", InvalidEndpoints),
+            ("pubkey", InvalidPublicKey),
+        ] {
+            let mut candidate = baseline.clone();
+            candidate.as_object_mut().expect("object fixture").remove(field);
+            assert_eq!(validate_updater(&candidate), Err(expected), "missing field: {field}");
+        }
+        assert_eq!(validate_updater(&Value::Null), Err(Transport("updater must be an object")));
     }
 
     #[test]
@@ -264,10 +334,21 @@ mod security_tests {
 #[test]
 fn glib_variant_string_iterator_backport_regression() {
     use glib::{prelude::*, Variant};
+
+    // Compile-time contract for the existing borrowed-string iterator API.
+    fn assert_iterator_contract<'a, I>(_: &I)
+    where
+        I: DoubleEndedIterator<Item = &'a str>
+            + ExactSizeIterator
+            + std::iter::FusedIterator,
+    {
+    }
+
     let v = Variant::array_from_iter::<String>(
         ["first", "second", "third", "fourth"].map(|s| s.to_variant())
     );
     let mut i = v.array_iter_str().unwrap();
+    assert_iterator_contract(&i);
     assert_eq!(i.size_hint(), (4, Some(4)));
     assert_eq!(i.next(), Some("first"));
     assert_eq!(i.len(), 3);

@@ -12,9 +12,9 @@ A security-oriented desktop application foundation built with the operating syst
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
 | Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
-| Next integrated build | In preparation | CP01–CP09 source changes on main; compilation and assessment pending |
+| Next integrated build | In preparation | CP01–CP12 source changes on main; compilation and assessment pending |
 
-> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP09. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
+> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP12. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
 
 ## Upcoming improvements
 
@@ -34,13 +34,16 @@ The current work strengthens verification of existing security and release contr
 | Ownership and lifetime verification | Linux regression covers borrowed strings surviving iterator scope, independent iterator cursors, explicit iterator drop, nonzero skips, empty strings and Unicode. No new shared mutable ownership or custom smart pointers. |
 | Concurrency verification | Bounded concurrent mixed loopback TCP requests check response isolation and worker recovery; controlled-promise UI regressions cover in-flight refresh, stale approval invalidation and failure recovery. No new runtime threads or locks. |
 | Updater lifecycle | Single tagged state replaces independent flags; pending approval is paired with its timestamp and consumed when installation starts. New regressions cover no-update recovery and exclusive in-flight installation. Runtime refactor awaits integrated tests. |
+| Pattern-based updater policy tests (CP10) | Typed failures, exact boolean and single-endpoint slice matching, guarded pinned public-key checks and missing/malformed configuration fixtures. Test-only; not a new signature verifier. |
+| Advanced Rust safeguards (CP11) | Package lint policy surfaces unsafe code for review and denies implicit unsafe operations inside unsafe functions. The Linux regression specifies a borrowed-string iterator trait contract checked by the compiler during the next build. Macro and vendor code unchanged; compiler validation pending. |
+| TCP lifecycle and framing (CP12) | Split-write and abandoned-request regressions check complete header framing, response byte length, cache policy, socket closure, worker cleanup and listener recovery. Corrected a prior CRLF fixture. Existing runtime worker limits and routes are unchanged. |
 | Test design | Independent positive and negative fixtures, per-directive omission checks, exact failure categories, diagnostic assertions and preservation of the existing CI regression selector. No newly ignored security tests. |
 
 These changes strengthen **test coverage, diagnostics, documentation, distribution safeguards and existing updater state management**, not new runtime network or access enforcement mechanisms. The current source changes introduce no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
 
 ### Technical review progress
 
-Seven chapters of the private Rust reference have been studied through extracted text: 188 of 559 physical pages processed (33.63%), including three pages without extracted text. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency and state-oriented design. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
+Ten chapters of the private Rust reference have been studied through extracted text: 288 of 559 physical pages processed through CP12 (51.52%), including five pages without extracted text. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency, state-oriented design, pattern matching, advanced Rust safeguards and bounded server lifecycle. CP01–CP12 are published source; integrated compilation and functional validation remain pending. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
 
 | Integration gate | Status |
 |---|---|
@@ -111,7 +114,7 @@ git clone https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite
 cd tailscale-commander-elite
 ```
 
-The public source on `main` includes checkpoints CP01–CP09. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
+The public source on `main` includes checkpoints CP01–CP12. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
 
 ### Development build (when authorized)
 
