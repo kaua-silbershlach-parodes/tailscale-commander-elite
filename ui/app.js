@@ -125,13 +125,23 @@ async function downloadAndInstall() {
   }
 }
 
-el('btn-check').addEventListener('click', checkNow);
-el('btn-download').addEventListener('click', downloadAndInstall);
-el('btn-restart').addEventListener('click', async () => {
+async function restartAfterInstall() {
+  if (lifecycle.kind !== 'restart-required') return;
+  lifecycle = { kind: 'restarting' };
+  el('btn-restart').disabled = true;
   try {
     await relaunch();
   } catch (err) {
     logLine('Restart failed: ' + errText(err));
+  } finally {
+    // If control returns to this window, allow an explicit restart retry,
+    // not another installation or update check.
+    lifecycle = { kind: 'restart-required' };
+    el('btn-restart').disabled = false;
   }
-});
+}
+
+el('btn-check').addEventListener('click', checkNow);
+el('btn-download').addEventListener('click', downloadAndInstall);
+el('btn-restart').addEventListener('click', restartAfterInstall);
 init();

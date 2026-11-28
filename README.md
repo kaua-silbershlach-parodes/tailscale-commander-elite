@@ -12,9 +12,9 @@ A security-oriented desktop application foundation built with the operating syst
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
 | Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
-| Next integrated build | In preparation | CP01–CP19 source changes on main; compilation and assessment pending |
+| Next integrated build | In preparation | CP01–CP23 source changes on main; compilation and assessment pending |
 
-> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP19. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
+> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP23. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
 
 ## Upcoming improvements
 
@@ -44,13 +44,17 @@ The current work strengthens verification of existing security and release contr
 | Borrowed policy diagnostics (CP17) | Add a regression for complete UTF-8 unexpected and duplicate CSP directives borrowed from their original policy buffer. No new allocation or unsafe operation in the validator; compilation pending. |
 | Structured version fixtures (CP18) | Group the three borrowed version inputs in a private named-field struct with a read-only validation method. Existing checks and error categories are retained; compiler validation pending. |
 | Typed capability checks (CP19) | Dedicated regression guard distinguishes window scope, exact permission set, remote declaration, window definition and installer-mode violations; 21 negative fixtures. Existing capability configuration unchanged; effective runtime ACL evaluation and compilation pending. |
+| Private test module (CP20) | Extract the 13 security regression tests into `src-tauri/src/security_tests.rs`, retaining test-only visibility, fixture paths and test bodies. The native entry point and exact Linux regression selector remain in the crate root. Source equivalence verified; compiler validation pending. |
+| Collection and encoding checks (CP21) | Add 15 backend header fixtures covering case-insensitive keys, duplicate rejection before map overwrite, accepted formatting and invalid ASCII/UTF-8 fields. Existing runtime parser and byte limit unchanged; functional verification pending. |
+| Recoverable restart errors (CP22) | Restrict relaunch to the post-installation state, exclude concurrent restart requests and permit explicit retry on a returned or failed relaunch. Three deterministic regressions cover the state contract; native restart verification pending. |
+| Generic fixture helper (CP23) | Share the negative JSON mutation procedure across typed updater and capability errors, preserving 32 field cases and the distinction between absent fields and explicit null values. Compiler validation pending. |
 | Test design | Independent positive and negative fixtures, per-directive omission checks, exact failure categories, diagnostic assertions and preservation of the existing CI regression selector. No newly ignored security tests. |
 
 These changes strengthen **test coverage, diagnostics, documentation, distribution safeguards and existing updater state management**, not new runtime network or access enforcement mechanisms. The current source changes introduce no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
 
 ### Technical review progress
 
-Sixteen chapters, front matter, five appendices and the index of the private Rust reference have been reviewed through extracted text: 463 of 559 physical pages processed through CP19 (82.83%), including thirteen pages without extracted text. The remaining range is physical pages 143–238. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency, state-oriented design, pattern matching, advanced Rust safeguards and bounded server lifecycle. CP01–CP19 are published source. Integrated compilation and functional validation remain pending. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
+All twenty chapters, front matter, five appendices and the index of the private Rust reference have been reviewed through extracted text: 559 of 559 physical pages accounted for through CP23 (100% physical-page coverage), including seventeen pages without extracted text. Visual inspection and integrated implementation validation remain pending. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency, state-oriented design, pattern matching, advanced Rust safeguards and bounded server lifecycle. CP01–CP23 are published source. Integrated compilation and functional validation remain pending. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
 
 | Integration gate | Status |
 |---|---|
@@ -121,7 +125,7 @@ git clone https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite
 cd tailscale-commander-elite
 ```
 
-The public source on `main` includes checkpoints CP01–CP19. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
+The public source on `main` includes checkpoints CP01–CP23. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
 
 ### Development build (when authorized)
 

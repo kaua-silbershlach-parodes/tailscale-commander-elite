@@ -5,10 +5,10 @@ const fs=require('node:fs');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../ui/app.js'),'utf8');
 function setup(){
-  const elements={}, clock={value:1000}, state={version:'1.2.2',calls:0,fail:false,checks:0,checkGate:null,installGate:null,available:true};
+  const elements={}, clock={value:1000}, state={version:'1.2.2',calls:0,fail:false,checks:0,checkGate:null,installGate:null,available:true,restarts:0,restartGate:null,restartFail:false};
   function el(id){return elements[id] ||= {textContent:'',style:{},setAttribute(){},classList:{remove(){}},addEventListener(){}}}
   class Clock extends Date {static now(){return clock.value}}
-  const ctx=vm.createContext({Date:Clock,document:{getElementById:el},window:{__TAURI__:{app:{getVersion:async()=> '1.2.1'},updater:{check:async()=>{state.checks++;if(state.checkGate)await state.checkGate;if(!state.available)return null;return {version:state.version,currentVersion:'1.2.1',downloadAndInstall:async()=>{state.calls++;if(state.installGate)await state.installGate;if(state.fail)throw Error('failed')}}}},process:{relaunch:async()=>{}}}}});
+  const ctx=vm.createContext({Date:Clock,document:{getElementById:el},window:{__TAURI__:{app:{getVersion:async()=> '1.2.1'},updater:{check:async()=>{state.checks++;if(state.checkGate)await state.checkGate;if(!state.available)return null;return {version:state.version,currentVersion:'1.2.1',downloadAndInstall:async()=>{state.calls++;if(state.installGate)await state.installGate;if(state.fail)throw Error('failed')}}}},process:{relaunch:async()=>{state.restarts++;if(state.restartGate)await state.restartGate;if(state.restartFail)throw Error('controlled restart failure')}}}}});
   vm.runInContext(source,ctx);
   return {ctx,state,clock,el,run:s=>vm.runInContext(s,ctx)};
 }
@@ -133,4 +133,50 @@ test('non-finite approval age cannot authorize installation',async()=>{
   assert.equal(t.state.calls,0);
   await t.run('downloadAndInstall()');
   assert.equal(t.state.calls,1);
+});
+
+test('restart is unavailable before installation succeeds',async()=>{
+  const t=setup();
+  await t.run('restartAfterInstall()');
+  await t.run('checkNow()');
+  await t.run('restartAfterInstall()');
+  t.state.fail=true;
+  await t.run('downloadAndInstall()');
+  await t.run('restartAfterInstall()');
+  assert.equal(t.state.restarts,0);
+});
+test('in-flight restart excludes duplicate restarts, checks and installs',async()=>{
+  const t=setup();
+  await t.run('checkNow()');
+  await t.run('downloadAndInstall()');
+  let release;
+  t.state.restartGate=new Promise(resolve=>{release=resolve});
+  const restart=t.run('restartAfterInstall()');
+  try {
+    await Promise.all([t.run('restartAfterInstall()'),t.run('checkNow()'),t.run('downloadAndInstall()')]);
+    assert.equal(t.state.restarts,1);
+    assert.equal(t.state.checks,1);
+    assert.equal(t.state.calls,1);
+    assert.equal(t.el('btn-restart').disabled,true);
+  } finally {
+    release();
+    await restart;
+  }
+  assert.equal(t.el('btn-restart').disabled,false);
+});
+test('failed restart permits explicit retry without reinstalling',async()=>{
+  const t=setup();
+  await t.run('checkNow()');
+  await t.run('downloadAndInstall()');
+  t.state.restartFail=true;
+  await t.run('restartAfterInstall()');
+  assert.match(t.el('upd-log').textContent,/Restart failed: controlled restart failure/);
+  assert.equal(t.el('btn-restart').disabled,false);
+  await t.run('checkNow()');
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.checks,1);
+  assert.equal(t.state.calls,1);
+  t.state.restartFail=false;
+  await t.run('restartAfterInstall()');
+  assert.equal(t.state.restarts,2);
 });

@@ -27,6 +27,40 @@ defmodule TailscaleCommanderEliteBackend.HealthServerTest do
     end
   end
 
+  test "header keys are case insensitive and duplicates never overwrite prior values" do
+    prefix = "GET /health HTTP/1.1\r\n"
+    for headers <- [
+      "hOsT: LOCALHOST\r\n",
+      "Host: localhost\r\nX-Note: first:second\r\n",
+      "Host: localhost\r\ncOnTeNt-LeNgTh: 0\r\n"
+    ] do
+      assert {"200 OK", _} = HealthServer.handle_request(prefix <> headers <> "\r\n")
+    end
+    for headers <- [
+      "Host: localhost\r\nhOST: localhost\r\n",
+      "Host: localhost\r\nHOST: foreign.example\r\n",
+      "Host: foreign.example\r\nhost: localhost\r\n",
+      "Host: localhost\r\nContent-Length: 0\r\ncontent-length: 0\r\n",
+      "Host: localhost\r\nContent-Length: 1\r\ncontent-length: 0\r\n",
+      "Host: localhost\r\nX-Note: one\r\nx-note: two\r\n",
+      "Host: localhost\r\nTRANSFER-ENCODING: identity\r\n"
+    ] do
+      assert {"400 Bad Request", _} = HealthServer.handle_request(prefix <> headers <> "\r\n")
+    end
+  end
+
+  test "valid UTF-8 is not sufficient for ASCII-only HTTP fields" do
+    for raw <- [
+      "GET /saúde HTTP/1.1\r\nHost: localhost\r\n\r\n",
+      "GET /health HTTP/1.1\r\nHost: localhost\r\nX-Note: ação\r\n\r\n",
+      "GET /health HTTP/1.1\r\nHost: localhost\r\nX-🚀: value\r\n\r\n",
+      "GET /health HTTP/1.1\r\nHost: localhost\r\nX-Note: a" <> <<0>> <> "b\r\n\r\n",
+      "GET /health HTTP/1.1\r\nHost: localhost\r\nX-Note: " <> <<255>> <> "\r\n\r\n"
+    ] do
+      assert {"400 Bad Request", _} = HealthServer.handle_request(raw)
+    end
+  end
+
   test "size boundary" do
     base = "GET /health HTTP/1.1\r\nHost: localhost\r\nX-Pad: "
     suffix = "\r\n\r\n"
