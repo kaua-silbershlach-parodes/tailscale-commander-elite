@@ -7,11 +7,9 @@ const check = tauri.updater?.check;
 const relaunch = tauri.process?.relaunch;
 
 const el = (id) => document.getElementById(id);
-let pendingUpdate = null;
-let pendingUpdateAt = 0;
-let installing = false;
-let checking = false;
-let restartRequired = false;
+// A single lifecycle state replaces independent flags. Only ready owns
+// an update approval and its timestamp; installation consumes that approval.
+let lifecycle = { kind: 'idle' };
 
 function errText(err) {
   return err?.message ?? String(err);
@@ -51,11 +49,10 @@ async function init() {
 }
 
 async function checkNow() {
-  if (checking || installing || restartRequired) return;
-  checking = true;
+  if (lifecycle.kind !== 'idle' && lifecycle.kind !== 'ready') return;
+  lifecycle = { kind: 'checking' };
   el('btn-check').disabled = true;
   el('btn-download').disabled = true;
-  pendingUpdate = null;
   setProgress(0);
   setState('checking...');
   try {
@@ -65,28 +62,30 @@ async function checkNow() {
       logLine('No update available. You are on the newest version.');
       return;
     }
-    pendingUpdate = update;
-    pendingUpdateAt = Date.now();
+    lifecycle = { kind: 'ready', update, checkedAt: Date.now() };
     setState('update available: ' + update.version);
     logLine(`Update found: ${update.version} (current: ${update.currentVersion}).`);
     el('btn-download').disabled = false;
   } catch (err) {
+    lifecycle = { kind: 'idle' };
+    el('btn-download').disabled = true;
     setState('check failed');
     logLine('Update check failed: ' + errText(err));
   } finally {
-    checking = false;
-    el('btn-check').disabled = restartRequired;
+    if (lifecycle.kind === 'checking') lifecycle = { kind: 'idle' };
+    el('btn-check').disabled = lifecycle.kind === 'restart-required';
   }
 }
 
 async function downloadAndInstall() {
-  if (!pendingUpdate || installing || checking || restartRequired) return;
-  if (Date.now() - pendingUpdateAt > 600000) {
+  if (lifecycle.kind !== 'ready') return;
+  const { update, checkedAt } = lifecycle;
+  if (Date.now() - checkedAt > 600000) {
     logLine('Update check is stale; review the refreshed result before installing.');
     await checkNow();
     return;
   }
-  installing = true;
+  lifecycle = { kind: 'installing' };
   el('btn-download').disabled = true;
   el('btn-check').disabled = true;
   setProgress(0);
@@ -94,7 +93,7 @@ async function downloadAndInstall() {
   let downloaded = 0;
   let total = 0;
   try {
-    await pendingUpdate.downloadAndInstall((event) => {
+    await update.downloadAndInstall((event) => {
       if (event.event === 'Started') {
         total = Number(event.data.contentLength) || 0;
         logLine(`Download started (${total} bytes).`);
@@ -108,22 +107,18 @@ async function downloadAndInstall() {
         logLine('Download finished.');
       }
     });
-    pendingUpdate = null;
-    pendingUpdateAt = 0;
-    restartRequired = true;
+    lifecycle = { kind: 'restart-required' };
     setState('update installed - restart to apply');
     logLine('Update installed. Restart the app to apply it.');
     el('btn-restart').classList.remove('hidden');
   } catch (err) {
     setState('install failed');
     logLine('Download/install failed: ' + errText(err));
-    pendingUpdate = null;
-    pendingUpdateAt = 0;
+    if (lifecycle.kind === 'installing') lifecycle = { kind: 'idle' };
     el('btn-download').disabled = true;
     logLine('Check for updates again before retrying.');
   } finally {
-    installing = false;
-    el('btn-check').disabled = restartRequired;
+    el('btn-check').disabled = lifecycle.kind === 'restart-required';
   }
 }
 

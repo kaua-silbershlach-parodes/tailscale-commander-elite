@@ -95,6 +95,43 @@ defmodule TailscaleCommanderEliteBackend.HealthServerTest do
     end
   end
 
+  test "bounded concurrent mixed TCP requests keep responses isolated and release workers" do
+    p = port()
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    cases = [
+      {request("GET", "/health", "localhost:#{p}"), "200 OK"},
+      {request("GET", "/unknown", "localhost:#{p}"), "404 Not Found"},
+      {request("GET", "/health", "foreign.example"), "400 Bad Request"},
+      {request("POST", "/health", "localhost:#{p}"), "404 Not Found"}
+    ]
+
+    results =
+      List.duplicate(cases, 4)
+      |> List.flatten()
+      |> Task.async_stream(fn {raw, status} ->
+        {:ok, socket} = connect(p)
+        try do
+          :ok = :gen_tcp.send(socket, raw)
+          response = receive_response(socket, 2_000)
+          assert String.starts_with?(response, "HTTP/1.1 #{status}\\r\\n")
+          if status == "200 OK" do
+            assert response =~ ~s("status":"ok")
+          else
+            refute response =~ ~s("status":"ok")
+          end
+          :verified
+        after
+          :gen_tcp.close(socket)
+        end
+      end, max_concurrency: 8, ordered: false, timeout: 5_000, on_timeout: :kill_task)
+      |> Enum.to_list()
+
+    assert length(results) == 16
+    assert Enum.all?(results, &(&1 == {:ok, :verified}))
+    await_workers(0, System.monotonic_time(:millisecond) + 2_000)
+    exchange(p)
+  end
+
   test "worker cap rejects excess connection and recovers after close" do
     p = port()
     {:ok, {{127, 0, 0, 1}, ^p}} = :inet.sockname(:sys.get_state(HealthServer).listen)

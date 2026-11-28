@@ -1,3 +1,23 @@
+//! Native desktop shell for Tailscale Commander Elite.
+//!
+//! This crate initializes the Tauri application, logging, signed updater and
+//! restart support. The separate Elixir/OTP service is not started or managed
+//! by this crate. The internal regression helpers are not a public API.
+
+/// Starts the native application and enters the Tauri event loop.
+///
+/// A startup or application-run error is logged and terminates the process
+/// with exit status 1. Explicit process exit does not run remaining stack
+/// destructors; do not rely on them for application-wide shutdown guarantees.
+/// This function is an application entry point, not a reusable background-service API.
+///
+/// # Examples
+///
+/// The entry-point signature can be checked without launching a window:
+///
+/// ```
+/// let _entry_point: fn() = tailscale_commander_elite_lib::run;
+/// ```
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let log_level = if cfg!(debug_assertions) {
@@ -27,7 +47,62 @@ mod security_tests {
     use serde_json::{json, Value};
 
     fn config() -> Value {
-        serde_json::from_str(include_str!("../tauri.conf.json")).unwrap()
+        serde_json::from_str(include_str!("../tauri.conf.json"))
+            .expect("embedded Tauri configuration must be valid JSON")
+    }
+
+    fn secure_transport_options(updater: &Value) -> Result<(), &'static str> {
+        if !updater.is_object() {
+            return Err("updater must be an object");
+        }
+        for key in [
+            "dangerousInsecureTransportProtocol",
+            "dangerousAcceptInvalidCerts",
+            "dangerousAcceptInvalidHostnames",
+        ] {
+            match updater.get(key) {
+                None | Some(Value::Bool(false)) => {}
+                Some(_) => return Err(key),
+            }
+        }
+        Ok(())
+    }
+
+    const CSP_DIRECTIVES: [&str; 9] = [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self' data:",
+        "connect-src 'self' ipc: http://ipc.localhost",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'none'",
+    ];
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum CspViolation<'a> {
+        Unexpected(&'a str),
+        Duplicate(&'a str),
+        Missing(&'static str),
+    }
+
+    fn validate_csp(csp: &str) -> Result<(), CspViolation<'_>> {
+        let mut seen = [false; CSP_DIRECTIVES.len()];
+        for directive in csp.split(';').map(str::trim).filter(|d| !d.is_empty()) {
+            let index = CSP_DIRECTIVES.iter().position(|expected| *expected == directive)
+                .ok_or(CspViolation::Unexpected(directive))?;
+            if seen[index] {
+                return Err(CspViolation::Duplicate(directive));
+            }
+            seen[index] = true;
+        }
+        for (index, expected) in CSP_DIRECTIVES.iter().enumerate() {
+            if !seen[index] {
+                return Err(CspViolation::Missing(*expected));
+            }
+        }
+        Ok(())
     }
 
     #[test]
@@ -36,26 +111,74 @@ mod security_tests {
         let u = &c["plugins"]["updater"];
         assert_eq!(u["requireSignedVersion"], true);
         assert_eq!(u["allowDowngrades"], false);
-        for key in ["dangerousInsecureTransportProtocol", "dangerousAcceptInvalidCerts",
-                    "dangerousAcceptInvalidHostnames"] {
-            assert!(u[key].is_null() || u[key] == false);
-        }
+        assert_eq!(secure_transport_options(u), Ok(()));
         assert_eq!(u["endpoints"], json!(["https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/latest/download/latest.json"]));
         assert_eq!(u["pubkey"], "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3QzUzM0U0MzNGOTBGRUMKUldUc0Qva3o1RFBGVis3T09GT21wKzNGbFo3Nm9mMkZjWEJ3cldlWGpkU2F1dDFqdHZpL2Nad04K");
     }
 
     #[test]
-    fn webview_has_restrictive_csp() {
+    fn webview_has_restrictive_csp() -> Result<(), String> {
         let c = config();
         let security = &c["app"]["security"];
-        assert_eq!(security["freezePrototype"], true);
-        let csp = security["csp"].as_str().unwrap();
-        for directive in ["default-src 'self'", "script-src 'self'", "object-src 'none'",
-                          "base-uri 'none'", "frame-ancestors 'none'", "form-action 'none'",
-                          "connect-src 'self' ipc: http://ipc.localhost"] {
-            assert!(csp.split(';').any(|d| d.trim() == directive), "{directive}");
+        assert_eq!(security["freezePrototype"], true, "WebView prototypes must be frozen");
+        let csp = security["csp"].as_str().ok_or("CSP must be a string")?;
+        validate_csp(csp).map_err(|violation| format!("CSP policy violation: {violation:?}"))
+    }
+
+    #[test]
+    fn csp_accepts_equivalent_directive_order_and_whitespace() {
+        let ordered = CSP_DIRECTIVES.join("; ");
+        let reversed = CSP_DIRECTIVES.iter().rev().copied().collect::<Vec<_>>().join(";\t");
+        assert_eq!(validate_csp(&ordered), Ok(()), "canonical policy rejected");
+        assert_eq!(validate_csp(&format!(" {reversed}; ")), Ok(()), "equivalent policy rejected");
+    }
+
+    #[test]
+    fn csp_rejects_duplicate_extra_and_weakened_directives() {
+        let valid = CSP_DIRECTIVES.join("; ");
+        assert_eq!(validate_csp(&valid), Ok(()));
+        assert_eq!(validate_csp(&format!("script-src *; {valid}")), Err(CspViolation::Unexpected("script-src *")));
+        assert_eq!(validate_csp(&format!("{valid}; script-src 'self'")), Err(CspViolation::Duplicate("script-src 'self'")));
+        assert_eq!(validate_csp(""), Err(CspViolation::Missing("default-src 'self'")));
+        assert_eq!(validate_csp(&format!("{valid}; script-src-elem https:")), Err(CspViolation::Unexpected("script-src-elem https:")));
+        assert_eq!(validate_csp(&valid.replace("style-src 'self'", "style-src *")), Err(CspViolation::Unexpected("style-src *")));
+        assert_eq!(validate_csp(&valid.replace("img-src 'self' data:", "img-src *")), Err(CspViolation::Unexpected("img-src *")));
+        assert_eq!(validate_csp(&valid.replace("object-src 'none'; ", "")), Err(CspViolation::Missing("object-src 'none'")));
+    }
+
+    #[test]
+    fn csp_rejects_each_missing_required_directive() {
+        for required in CSP_DIRECTIVES {
+            let incomplete = CSP_DIRECTIVES.iter().copied()
+                .filter(|directive| *directive != required)
+                .collect::<Vec<_>>().join("; ");
+            assert_eq!(validate_csp(&incomplete), Err(CspViolation::Missing(required)), "required directive: {required}");
         }
-        assert!(!csp.contains("unsafe-eval") && !csp.contains("unsafe-inline"));
+    }
+
+    #[test]
+    fn updater_rejects_non_object_transport_configuration() {
+        for invalid in [Value::Null, json!([]), json!(false), json!(0), json!("updater")] {
+            assert_eq!(secure_transport_options(&invalid), Err("updater must be an object"), "input: {invalid}");
+        }
+    }
+
+    #[test]
+    fn updater_rejects_insecure_or_malformed_transport_options() {
+        assert_eq!(secure_transport_options(&json!({})), Ok(()));
+        for key in [
+            "dangerousInsecureTransportProtocol",
+            "dangerousAcceptInvalidCerts",
+            "dangerousAcceptInvalidHostnames",
+        ] {
+            let mut updater = json!({});
+            updater[key] = json!(false);
+            assert_eq!(secure_transport_options(&updater), Ok(()));
+            for invalid in [json!(true), Value::Null, json!("false"), json!(0)] {
+                updater[key] = invalid;
+                assert_eq!(secure_transport_options(&updater), Err(key), "invalid option {key}: {}", updater[key]);
+            }
+        }
     }
 
     #[test]
@@ -69,13 +192,71 @@ mod security_tests {
         assert_eq!(c["bundle"]["windows"]["nsis"]["installMode"], "currentUser");
     }
 
+    #[derive(Debug, PartialEq, Eq)]
+    enum VersionViolation {
+        MissingShellVersion,
+        ShellVersionMismatch,
+        MissingBackendVersion,
+        DuplicateBackendVersion,
+        BackendVersionMismatch,
+    }
+
+    // This is an exact source-format guard for the current Mix manifest, not an Elixir parser.
+    fn validate_candidate_versions(
+        shell: &Value,
+        cargo_version: &str,
+        mix_manifest: &str,
+    ) -> Result<(), VersionViolation> {
+        let shell_version = shell["version"].as_str()
+            .ok_or(VersionViolation::MissingShellVersion)?;
+        if shell_version != cargo_version {
+            return Err(VersionViolation::ShellVersionMismatch);
+        }
+
+        let mut declarations = mix_manifest.lines()
+            .filter_map(|line| line.trim().strip_prefix("version:"));
+        let backend = declarations.next()
+            .ok_or(VersionViolation::MissingBackendVersion)?;
+        if declarations.next().is_some() {
+            return Err(VersionViolation::DuplicateBackendVersion);
+        }
+        // Borrow the version directly from the manifest instead of allocating a comparison string.
+        let backend_version = backend.trim().strip_prefix('"')
+            .and_then(|value| value.strip_suffix("\","));
+        if backend_version != Some(cargo_version) {
+            return Err(VersionViolation::BackendVersionMismatch);
+        }
+        Ok(())
+    }
+
     #[test]
     fn candidate_version_is_consistent() {
         let c = config();
-        let version = c["version"].as_str().unwrap();
-        assert_eq!(version, env!("CARGO_PKG_VERSION"));
         let mix = include_str!("../../backend/mix.exs");
-        assert!(mix.lines().any(|line| line.trim() == format!("version: \"{version}\",")));
+        assert_eq!(
+            validate_candidate_versions(&c, env!("CARGO_PKG_VERSION"), mix),
+            Ok(()),
+            "Tauri, Cargo and Mix versions must agree"
+        );
+    }
+
+    #[test]
+    fn version_validation_rejects_missing_malformed_and_conflicting_metadata() {
+        let valid = json!({"version": "1.2.3"});
+        let mix = "  version: \"1.2.3\",\n";
+        assert_eq!(validate_candidate_versions(&valid, "1.2.3", mix), Ok(()));
+        for missing in [json!({}), json!({"version": null}), json!({"version": 123})] {
+            assert_eq!(validate_candidate_versions(&missing, "1.2.3", mix), Err(VersionViolation::MissingShellVersion));
+        }
+        assert_eq!(validate_candidate_versions(&json!({"version":"1.2.4"}), "1.2.3", mix), Err(VersionViolation::ShellVersionMismatch));
+        assert_eq!(validate_candidate_versions(&valid, "1.2.3", "# version: \"1.2.3\",\n"), Err(VersionViolation::MissingBackendVersion));
+        assert_eq!(validate_candidate_versions(&valid, "1.2.3", "version: \"1.2.4\",\n"), Err(VersionViolation::BackendVersionMismatch));
+        for malformed in ["version: 123,\n", "version: \"1.2.3\"\n", "version: \"1.2.3\", extra\n", "version: \"1.2.30\",\n"] {
+            assert_eq!(validate_candidate_versions(&valid, "1.2.3", malformed), Err(VersionViolation::BackendVersionMismatch), "manifest: {malformed:?}");
+        }
+        for duplicate in [format!("{mix}{mix}"), format!("{mix}version: \"1.2.4\",\n")] {
+            assert_eq!(validate_candidate_versions(&valid, "1.2.3", &duplicate), Err(VersionViolation::DuplicateBackendVersion));
+        }
     }
 }
 
@@ -87,10 +268,63 @@ fn glib_variant_string_iterator_backport_regression() {
         ["first", "second", "third", "fourth"].map(|s| s.to_variant())
     );
     let mut i = v.array_iter_str().unwrap();
+    assert_eq!(i.size_hint(), (4, Some(4)));
     assert_eq!(i.next(), Some("first"));
+    assert_eq!(i.len(), 3);
     assert_eq!(i.next_back(), Some("fourth"));
+    assert_eq!(i.len(), 2);
     assert_eq!(i.nth(0), Some("second"));
+    assert_eq!(i.len(), 1);
     assert_eq!(i.nth_back(0), Some("third"));
+    assert_eq!(i.size_hint(), (0, Some(0)));
+    assert_eq!(i.next(), None);
+    assert_eq!(i.next_back(), None);
     assert_eq!(i.next(), None);
     assert_eq!(v.array_iter_str().unwrap().last(), Some("fourth"));
+    assert_eq!(v.array_iter_str().unwrap().count(), 4);
+
+    // A borrowed string is tied to the owning Variant, not to the iterator.
+    let retained = {
+        let mut scoped = v.array_iter_str().unwrap();
+        scoped.next().expect("nonempty fixture")
+    };
+    assert_eq!(retained, "first");
+
+    // Independent iterators borrow the same owner without sharing cursor state.
+    let mut left = v.array_iter_str().unwrap();
+    let mut right = v.array_iter_str().unwrap();
+    assert_eq!(left.nth(1), Some("second"));
+    assert_eq!(right.nth_back(1), Some("third"));
+    drop(left);
+    assert_eq!(right.next(), Some("first"));
+    assert_eq!(retained, "first");
+
+    let text = Variant::array_from_iter::<String>(
+        ["", "a\u{00e7}\u{00e3}o", "\u{1f680}"].map(|s| s.to_variant())
+    );
+    let borrowed = text.array_iter_str().unwrap().collect::<Vec<_>>();
+    assert_eq!(borrowed, vec!["", "a\u{00e7}\u{00e3}o", "\u{1f680}"]);
+
+    // Out-of-range skips must exhaust the iterator, including arithmetic overflow.
+    for skip in [4, usize::MAX] {
+        let mut forward = v.array_iter_str().unwrap();
+        assert_eq!(forward.nth(skip), None);
+        assert_eq!(forward.len(), 0);
+        assert_eq!(forward.next_back(), None);
+
+        let mut backward = v.array_iter_str().unwrap();
+        assert_eq!(backward.nth_back(skip), None);
+        assert_eq!(backward.len(), 0);
+        assert_eq!(backward.next(), None);
+    }
+    let mut partially_consumed = v.array_iter_str().unwrap();
+    assert_eq!(partially_consumed.next(), Some("first"));
+    assert_eq!(partially_consumed.nth(usize::MAX), None);
+    assert_eq!(partially_consumed.next_back(), None);
+
+    let empty = Variant::array_from_iter::<String>(std::iter::empty::<Variant>());
+    let mut empty_iter = empty.array_iter_str().unwrap();
+    assert_eq!(empty_iter.size_hint(), (0, Some(0)));
+    assert_eq!(empty_iter.next(), None);
+    assert_eq!(empty_iter.next_back(), None);
 }

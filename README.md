@@ -12,9 +12,9 @@ A security-oriented desktop application foundation built with the operating syst
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
 | Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
-| Next integrated build | In preparation | Additional Rust verification changes implemented locally; compilation and assessment pending |
+| Next integrated build | In preparation | CP01–CP09 source changes on main; compilation and assessment pending |
 
-> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below have been implemented in the local development workspace and are planned for integration. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
+> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP09. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
 
 ## Upcoming improvements
 
@@ -29,13 +29,18 @@ The current work strengthens verification of existing security and release contr
 | Version integrity | Dedicated pure validator checks Tauri, Cargo and the current Mix manifest format; missing, invalid, incompatible and duplicate version declarations have negative fixtures. |
 | Borrowing and allocation | Manifest version comparison borrows string slices instead of constructing an intermediate comparison string. |
 | Linux iterator verification | Expanded GLib regression covers size hints, exact remaining length, repeated exhaustion, empty arrays, count, out-of-range skips and arithmetic overflow. Authenticated vendor source is unchanged. |
+| Cargo distribution policy | Registry publication is disabled in the application manifest; repository and existing license-file metadata are explicit. |
+| Rust API documentation | Crate scope, entry-point behavior and explicit-exit destructor limitations are documented, with a signature doctest that does not launch the application. |
+| Ownership and lifetime verification | Linux regression covers borrowed strings surviving iterator scope, independent iterator cursors, explicit iterator drop, nonzero skips, empty strings and Unicode. No new shared mutable ownership or custom smart pointers. |
+| Concurrency verification | Bounded concurrent mixed loopback TCP requests check response isolation and worker recovery; controlled-promise UI regressions cover in-flight refresh, stale approval invalidation and failure recovery. No new runtime threads or locks. |
+| Updater lifecycle | Single tagged state replaces independent flags; pending approval is paired with its timestamp and consumed when installation starts. New regressions cover no-update recovery and exclusive in-flight installation. Runtime refactor awaits integrated tests. |
 | Test design | Independent positive and negative fixtures, per-directive omission checks, exact failure categories, diagnostic assertions and preservation of the existing CI regression selector. No newly ignored security tests. |
 
-These changes strengthen **test coverage and diagnostics**, not new runtime enforcement mechanisms. The current local work introduces no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
+These changes strengthen **test coverage, diagnostics, documentation, distribution safeguards and existing updater state management**, not new runtime network or access enforcement mechanisms. The current source changes introduce no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
 
 ### Technical review progress
 
-Three complete chapters of the private Rust reference have been studied: 83 of 559 physical pages (14.85%). Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators and closures. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
+Seven chapters of the private Rust reference have been studied through extracted text: 188 of 559 physical pages processed (33.63%), including three pages without extracted text. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency and state-oriented design. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
 
 | Integration gate | Status |
 |---|---|
@@ -106,7 +111,7 @@ git clone https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite
 cd tailscale-commander-elite
 ```
 
-The public source is the integrated baseline. New local changes announced here will become available after integration. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
+The public source on `main` includes checkpoints CP01–CP09. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
 
 ### Development build (when authorized)
 
@@ -189,7 +194,7 @@ Release signing requires recorded approval, completed pre-signing assessment and
 3. Resolve any failures, rerun applicable security gates and complete the independent assessment.
 4. After authorization, sign and verify production artifacts, perform isolated installation checks and publish the release.
 
-There is no announced release date. The upcoming build is preparation work, not an available download. See [BOOK_CHECKLIST.md](BOOK_CHECKLIST.md) for the integrated baseline's audit trail; new local checkpoints are pending integration.
+There is no announced release date. The upcoming build is preparation work, not an available download. See [BOOK_CHECKLIST.md](BOOK_CHECKLIST.md) for the audit trail and source-review checkpoints; build, functional tests and independent assessment remain pending.
 
 ## License
 
