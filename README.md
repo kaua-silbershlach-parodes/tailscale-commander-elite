@@ -12,9 +12,9 @@ A security-oriented desktop application foundation built with the operating syst
 |---|---|---|
 | Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
 | Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
-| Next integrated build | In preparation | CP01–CP12 source changes on main; compilation and assessment pending |
+| Next integrated build | In preparation | CP01–CP19 source changes on main; compilation and assessment pending |
 
-> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP12. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
+> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below are included in the public source on `main` through checkpoint CP19. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
 
 ## Upcoming improvements
 
@@ -37,13 +37,20 @@ The current work strengthens verification of existing security and release contr
 | Pattern-based updater policy tests (CP10) | Typed failures, exact boolean and single-endpoint slice matching, guarded pinned public-key checks and missing/malformed configuration fixtures. Test-only; not a new signature verifier. |
 | Advanced Rust safeguards (CP11) | Package lint policy surfaces unsafe code for review and denies implicit unsafe operations inside unsafe functions. The Linux regression specifies a borrowed-string iterator trait contract checked by the compiler during the next build. Macro and vendor code unchanged; compiler validation pending. |
 | TCP lifecycle and framing (CP12) | Split-write and abandoned-request regressions check complete header framing, response byte length, cache policy, socket closure, worker cleanup and listener recovery. Corrected a prior CRLF fixture. Existing runtime worker limits and routes are unchanged. |
+| Development tool review (CP13) | Document first-party formatting and locked Clippy review before the next integrated build. Keep the existing Rust edition, compiler and derived diagnostic traits. No automatic fixes or tool installation. |
+| Toolchain consistency (CP14) | Windows clone-and-check explicitly selects the pinned candidate compiler for locked type checking; documented Rust test commands use the same version. Source-only inspection remains separate from compiler work. Script validation pending. |
+| Input parsing (CP15) | Expanded backend port-parser fixtures cover valid numeric boundaries, accepted formatting, malformed and oversized values, Unicode numerals and exact error payloads. Existing runtime parser unchanged. |
+| Approval age validation (CP16) | Name the ten-minute approval limit and reject negative or non-finite elapsed time before installing. Deterministic regressions cover the exact boundary and clock anomalies. Wall-clock time remains in use; functional verification pending. |
+| Borrowed policy diagnostics (CP17) | Add a regression for complete UTF-8 unexpected and duplicate CSP directives borrowed from their original policy buffer. No new allocation or unsafe operation in the validator; compilation pending. |
+| Structured version fixtures (CP18) | Group the three borrowed version inputs in a private named-field struct with a read-only validation method. Existing checks and error categories are retained; compiler validation pending. |
+| Typed capability checks (CP19) | Dedicated regression guard distinguishes window scope, exact permission set, remote declaration, window definition and installer-mode violations; 21 negative fixtures. Existing capability configuration unchanged; effective runtime ACL evaluation and compilation pending. |
 | Test design | Independent positive and negative fixtures, per-directive omission checks, exact failure categories, diagnostic assertions and preservation of the existing CI regression selector. No newly ignored security tests. |
 
 These changes strengthen **test coverage, diagnostics, documentation, distribution safeguards and existing updater state management**, not new runtime network or access enforcement mechanisms. The current source changes introduce no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
 
 ### Technical review progress
 
-Ten chapters of the private Rust reference have been studied through extracted text: 288 of 559 physical pages processed through CP12 (51.52%), including five pages without extracted text. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency, state-oriented design, pattern matching, advanced Rust safeguards and bounded server lifecycle. CP01–CP12 are published source; integrated compilation and functional validation remain pending. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
+Sixteen chapters, front matter, five appendices and the index of the private Rust reference have been reviewed through extracted text: 463 of 559 physical pages processed through CP19 (82.83%), including thirteen pages without extracted text. The remaining range is physical pages 143–238. Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators, closures, Cargo release engineering, ownership, smart pointers, safe concurrency, state-oriented design, pattern matching, advanced Rust safeguards and bounded server lifecycle. CP01–CP19 are published source. Integrated compilation and functional validation remain pending. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
 
 | Integration gate | Status |
 |---|---|
@@ -114,9 +121,11 @@ git clone https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite
 cd tailscale-commander-elite
 ```
 
-The public source on `main` includes checkpoints CP01–CP12. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
+The public source on `main` includes checkpoints CP01–CP19. These source changes are not a validated binary release. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
 
 ### Development build (when authorized)
+
+Source-only review does not invoke Cargo compilation commands. `cargo check` avoids producing the final executable but still performs compiler work and can build dependencies and run build scripts. Defer it, tests, Clippy and installer scripts until integrated validation is authorized. Keep the existing toolchain pin and lockfile; verify the configured toolchain before any installer run.
 
 ```sh
 rustup toolchain install 1.100.0 --profile minimal
@@ -157,10 +166,18 @@ python tools/dependency_policy.py
 python tools/verify_release.py latest
 ```
 
-Run backend tests from `backend/` with an ephemeral port (`TAILSCALE_COMMANDER_ELITE_BACKEND_PORT=0 mix test` in POSIX shells; in PowerShell set `$env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT='0'` before `mix test`). Run `cargo test --locked` from `src-tauri/`. On Linux also execute:
+Run backend tests from `backend/` with an ephemeral port (`TAILSCALE_COMMANDER_ELITE_BACKEND_PORT=0 mix test` in POSIX shells; in PowerShell set `$env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT='0'` before `mix test`). Run `cargo +1.100.0 test --locked` from `src-tauri/`. Before the next authorized integrated validation, review first-party formatting and static-analysis diagnostics with the pinned toolchain. These commands are planned, not completed checks:
 
 ```sh
-cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact
+# From src-tauri/, after rustfmt and Clippy are available for the pinned toolchain
+cargo +1.100.0 fmt --check
+cargo +1.100.0 clippy --locked --all-targets
+```
+
+Clippy invokes compiler analysis and may compile dependencies; defer it until build authorization. Review each diagnostic and any formatting diff before applying changes. Do not use automatic fixes or edition migration as a substitute for review; preserve the authenticated vendor tree. On Linux also execute:
+
+```sh
+cargo +1.100.0 test --release --locked glib_variant_string_iterator_backport_regression -- --exact
 ```
 
 Confirm that the named regression actually ran. Python signature tests require cryptography and trusted minisign on PATH. Use the authenticated platform bootstrap scripts in `tools/` before running a newly obtained verifier. The latest-release command verifies the published release, not the local candidate.

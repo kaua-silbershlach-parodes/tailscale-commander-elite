@@ -39,8 +39,18 @@ defmodule TailscaleCommanderEliteBackend.HealthServerTest do
     assert Application.parse_port(nil) == {:ok, 45_900}
     assert Application.parse_port("45900") == {:ok, 45_900}
     assert Application.parse_port("0") == {:ok, 0}
-    for bad <- ["abc", "45900x", "-1", "99999", ""] do
-      assert {:error, _} = Application.parse_port(bad)
+    for {raw, expected} <- [
+      {"1", 1}, {"65535", 65_535}, {" 45900\t", 45_900},
+      {"00080", 80}, {"+80", 80}
+    ] do
+      assert Application.parse_port(raw) == {:ok, expected}
+    end
+    for bad <- [
+      "abc", "45900x", "-1", "99999", "", " \t\r\n",
+      "65536", "1.5", "1e3", "0x50", "45 900", "80\n81",
+      "１２３", "١٢٣", String.duplicate("9", 100)
+    ] do
+      assert Application.parse_port(bad) == {:error, bad}
     end
   end
 

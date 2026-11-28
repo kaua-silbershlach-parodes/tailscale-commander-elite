@@ -87,6 +87,7 @@ mod security_tests {
         Missing(&'static str),
     }
 
+    // Borrow diagnostic text from the supplied policy; never return a detached byte offset.
     fn validate_csp(csp: &str) -> Result<(), CspViolation<'_>> {
         let mut seen = [false; CSP_DIRECTIVES.len()];
         for directive in csp.split(';').map(str::trim).filter(|d| !d.is_empty()) {
@@ -217,6 +218,32 @@ mod security_tests {
     }
 
     #[test]
+    fn csp_diagnostics_borrow_complete_utf8_directives() {
+        let valid = CSP_DIRECTIVES.join("; ");
+        let unknown = "x-policy-\u{00e7}\u{1f680}";
+        let owned = format!("{valid}; {unknown} ");
+        let violation = validate_csp(owned.as_str());
+        assert_eq!(violation, Err(CspViolation::Unexpected(unknown)));
+        if let Err(CspViolation::Unexpected(actual)) = violation {
+            // Compare the borrowed slice to the corresponding range of its owner.
+            let start = valid.len() + 2;
+            assert_eq!(actual, owned.get(start..start + unknown.len()).expect("UTF-8 boundaries"));
+            assert_eq!(actual.as_ptr(), owned[start..].as_ptr());
+        } else {
+            panic!("expected borrowed unexpected directive");
+        }
+
+        let duplicate = format!("{valid}; script-src 'self' ");
+        match validate_csp(&duplicate) {
+            Err(CspViolation::Duplicate(actual)) => {
+                assert_eq!(actual, "script-src 'self'");
+                assert_eq!(actual.as_ptr(), duplicate[valid.len() + 2..].as_ptr());
+            }
+            other => panic!("expected borrowed duplicate directive, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn csp_rejects_each_missing_required_directive() {
         for required in CSP_DIRECTIVES {
             let incomplete = CSP_DIRECTIVES.iter().copied()
@@ -251,15 +278,83 @@ mod security_tests {
         }
     }
 
+    #[derive(Debug, PartialEq, Eq)]
+    enum CapabilityViolation {
+        WindowScope,
+        PermissionSet,
+        RemoteScopeDeclared,
+        WindowDefinition,
+        InstallerMode,
+    }
+
+    // Source-level regression guard, not an evaluation of effective Tauri permissions.
+    fn validate_main_capability(config: &Value, cap: &Value) -> Result<(), CapabilityViolation> {
+        if cap.get("windows") != Some(&json!(["main"])) {
+            return Err(CapabilityViolation::WindowScope);
+        }
+        if cap.get("permissions") != Some(&json!(["core:app:allow-version", "updater:default", "process:allow-restart"])) {
+            return Err(CapabilityViolation::PermissionSet);
+        }
+        // The current baseline contains no remote-origin declaration, even a null one.
+        if cap.get("remote").is_some() {
+            return Err(CapabilityViolation::RemoteScopeDeclared);
+        }
+        match config.pointer("/app/windows").and_then(Value::as_array).map(Vec::as_slice) {
+            Some([window]) if window.get("label").and_then(Value::as_str) == Some("main") => {}
+            _ => return Err(CapabilityViolation::WindowDefinition),
+        }
+        match config.pointer("/bundle/windows/nsis/installMode").and_then(Value::as_str) {
+            Some("currentUser") => Ok(()),
+            _ => Err(CapabilityViolation::InstallerMode),
+        }
+    }
+
+    fn default_capability() -> Value {
+        serde_json::from_str(include_str!("../capabilities/default.json"))
+            .expect("embedded main capability must be valid JSON")
+    }
+
     #[test]
     fn main_window_has_only_declared_capabilities() {
+        assert_eq!(validate_main_capability(&config(), &default_capability()), Ok(()));
+    }
+
+    #[test]
+    fn capability_guard_rejects_missing_malformed_and_expanded_scope() {
+        use CapabilityViolation::*;
         let c = config();
-        let cap: Value = serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
-        assert_eq!(cap["windows"], json!(["main"]));
-        assert_eq!(cap["permissions"], json!(["core:app:allow-version", "updater:default", "process:allow-restart"]));
-        assert_eq!(c["app"]["windows"].as_array().unwrap().len(), 1);
-        assert_eq!(c["app"]["windows"][0]["label"], "main");
-        assert_eq!(c["bundle"]["windows"]["nsis"]["installMode"], "currentUser");
+        let cap = default_capability();
+        for (field, value, expected) in [
+            ("windows", Value::Null, WindowScope),
+            ("windows", json!("main"), WindowScope),
+            ("windows", json!(["main", "other"]), WindowScope),
+            ("windows", json!(["*"]), WindowScope),
+            ("permissions", Value::Null, PermissionSet),
+            ("permissions", json!([]), PermissionSet),
+            ("permissions", json!(["core:app:allow-version", "updater:default", "process:allow-restart", "shell:default"]), PermissionSet),
+            ("permissions", json!(["core:app:allow-version", "updater:default", "updater:default"]), PermissionSet),
+            ("remote", Value::Null, RemoteScopeDeclared),
+            ("remote", json!({"urls":["https://example.invalid"]}), RemoteScopeDeclared),
+        ] {
+            let mut candidate = cap.clone();
+            candidate[field] = value;
+            assert_eq!(validate_main_capability(&c, &candidate), Err(expected), "field: {field}");
+        }
+        for (field, expected) in [("windows", WindowScope), ("permissions", PermissionSet)] {
+            let mut candidate = cap.clone();
+            candidate.as_object_mut().expect("object fixture").remove(field);
+            assert_eq!(validate_main_capability(&c, &candidate), Err(expected), "missing: {field}");
+        }
+        for windows in [Value::Null, json!([]), json!([{}]), json!([{"label":"other"}]), json!([{"label":"main"},{"label":"other"}])] {
+            let mut candidate = c.clone();
+            candidate["app"]["windows"] = windows;
+            assert_eq!(validate_main_capability(&candidate, &cap), Err(WindowDefinition));
+        }
+        for mode in [Value::Null, json!("perMachine"), json!("both"), json!(true)] {
+            let mut candidate = c.clone();
+            candidate["bundle"]["windows"]["nsis"]["installMode"] = mode;
+            assert_eq!(validate_main_capability(&candidate, &cap), Err(InstallerMode));
+        }
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -271,32 +366,38 @@ mod security_tests {
         BackendVersionMismatch,
     }
 
-    // This is an exact source-format guard for the current Mix manifest, not an Elixir parser.
-    fn validate_candidate_versions(
-        shell: &Value,
-        cargo_version: &str,
-        mix_manifest: &str,
-    ) -> Result<(), VersionViolation> {
-        let shell_version = shell["version"].as_str()
-            .ok_or(VersionViolation::MissingShellVersion)?;
-        if shell_version != cargo_version {
-            return Err(VersionViolation::ShellVersionMismatch);
-        }
+    // Named borrowed inputs avoid confusing the Cargo version with Mix source text.
+    struct CandidateVersions<'a> {
+        shell: &'a Value,
+        cargo_version: &'a str,
+        mix_manifest: &'a str,
+    }
 
-        let mut declarations = mix_manifest.lines()
-            .filter_map(|line| line.trim().strip_prefix("version:"));
-        let backend = declarations.next()
-            .ok_or(VersionViolation::MissingBackendVersion)?;
-        if declarations.next().is_some() {
-            return Err(VersionViolation::DuplicateBackendVersion);
+    impl CandidateVersions<'_> {
+        // Exact source-format guard for the current Mix manifest, not an Elixir parser.
+        fn validate(&self) -> Result<(), VersionViolation> {
+            let Self { shell, cargo_version, mix_manifest } = *self;
+            let shell_version = shell["version"].as_str()
+                .ok_or(VersionViolation::MissingShellVersion)?;
+            if shell_version != cargo_version {
+                return Err(VersionViolation::ShellVersionMismatch);
+            }
+
+            let mut declarations = mix_manifest.lines()
+                .filter_map(|line| line.trim().strip_prefix("version:"));
+            let backend = declarations.next()
+                .ok_or(VersionViolation::MissingBackendVersion)?;
+            if declarations.next().is_some() {
+                return Err(VersionViolation::DuplicateBackendVersion);
+            }
+            // Borrow the version directly from the manifest instead of allocating a comparison string.
+            let backend_version = backend.trim().strip_prefix('"')
+                .and_then(|value| value.strip_suffix("\","));
+            if backend_version != Some(cargo_version) {
+                return Err(VersionViolation::BackendVersionMismatch);
+            }
+            Ok(())
         }
-        // Borrow the version directly from the manifest instead of allocating a comparison string.
-        let backend_version = backend.trim().strip_prefix('"')
-            .and_then(|value| value.strip_suffix("\","));
-        if backend_version != Some(cargo_version) {
-            return Err(VersionViolation::BackendVersionMismatch);
-        }
-        Ok(())
     }
 
     #[test]
@@ -304,7 +405,7 @@ mod security_tests {
         let c = config();
         let mix = include_str!("../../backend/mix.exs");
         assert_eq!(
-            validate_candidate_versions(&c, env!("CARGO_PKG_VERSION"), mix),
+            (CandidateVersions { shell: &c, cargo_version: env!("CARGO_PKG_VERSION"), mix_manifest: mix }).validate(),
             Ok(()),
             "Tauri, Cargo and Mix versions must agree"
         );
@@ -314,18 +415,18 @@ mod security_tests {
     fn version_validation_rejects_missing_malformed_and_conflicting_metadata() {
         let valid = json!({"version": "1.2.3"});
         let mix = "  version: \"1.2.3\",\n";
-        assert_eq!(validate_candidate_versions(&valid, "1.2.3", mix), Ok(()));
+        assert_eq!((CandidateVersions { shell: &valid, cargo_version: "1.2.3", mix_manifest: mix }).validate(), Ok(()));
         for missing in [json!({}), json!({"version": null}), json!({"version": 123})] {
-            assert_eq!(validate_candidate_versions(&missing, "1.2.3", mix), Err(VersionViolation::MissingShellVersion));
+            assert_eq!((CandidateVersions { shell: &missing, cargo_version: "1.2.3", mix_manifest: mix }).validate(), Err(VersionViolation::MissingShellVersion));
         }
-        assert_eq!(validate_candidate_versions(&json!({"version":"1.2.4"}), "1.2.3", mix), Err(VersionViolation::ShellVersionMismatch));
-        assert_eq!(validate_candidate_versions(&valid, "1.2.3", "# version: \"1.2.3\",\n"), Err(VersionViolation::MissingBackendVersion));
-        assert_eq!(validate_candidate_versions(&valid, "1.2.3", "version: \"1.2.4\",\n"), Err(VersionViolation::BackendVersionMismatch));
+        assert_eq!((CandidateVersions { shell: &json!({"version":"1.2.4"}), cargo_version: "1.2.3", mix_manifest: mix }).validate(), Err(VersionViolation::ShellVersionMismatch));
+        assert_eq!((CandidateVersions { shell: &valid, cargo_version: "1.2.3", mix_manifest: "# version: \"1.2.3\",\n" }).validate(), Err(VersionViolation::MissingBackendVersion));
+        assert_eq!((CandidateVersions { shell: &valid, cargo_version: "1.2.3", mix_manifest: "version: \"1.2.4\",\n" }).validate(), Err(VersionViolation::BackendVersionMismatch));
         for malformed in ["version: 123,\n", "version: \"1.2.3\"\n", "version: \"1.2.3\", extra\n", "version: \"1.2.30\",\n"] {
-            assert_eq!(validate_candidate_versions(&valid, "1.2.3", malformed), Err(VersionViolation::BackendVersionMismatch), "manifest: {malformed:?}");
+            assert_eq!((CandidateVersions { shell: &valid, cargo_version: "1.2.3", mix_manifest: malformed }).validate(), Err(VersionViolation::BackendVersionMismatch), "manifest: {malformed:?}");
         }
         for duplicate in [format!("{mix}{mix}"), format!("{mix}version: \"1.2.4\",\n")] {
-            assert_eq!(validate_candidate_versions(&valid, "1.2.3", &duplicate), Err(VersionViolation::DuplicateBackendVersion));
+            assert_eq!((CandidateVersions { shell: &valid, cargo_version: "1.2.3", mix_manifest: &duplicate }).validate(), Err(VersionViolation::DuplicateBackendVersion));
         }
     }
 }

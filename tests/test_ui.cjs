@@ -102,3 +102,35 @@ test('installation owns approval exclusively until completion',async()=>{
   assert.equal(t.state.calls,1);
   assert.equal(t.el('btn-check').disabled,true);
 });
+
+test('approval remains valid at the exact ten-minute boundary',async()=>{
+  const t=setup();
+  await t.run('checkNow()');
+  t.clock.value+=600000;
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.checks,1);
+  assert.equal(t.state.calls,1);
+});
+test('clock rollback invalidates approval and requires a new review',async()=>{
+  const t=setup();
+  await t.run('checkNow()');
+  t.clock.value-=1;
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.checks,2);
+  assert.equal(t.state.calls,0);
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.calls,1);
+});
+test('non-finite approval age cannot authorize installation',async()=>{
+  const t=setup();
+  await t.run('checkNow()');
+  t.clock.value=NaN;
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.calls,0);
+  t.clock.value=2000;
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.checks,3);
+  assert.equal(t.state.calls,0);
+  await t.run('downloadAndInstall()');
+  assert.equal(t.state.calls,1);
+});

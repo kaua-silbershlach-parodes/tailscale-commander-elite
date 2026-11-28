@@ -7,6 +7,7 @@ const check = tauri.updater?.check;
 const relaunch = tauri.process?.relaunch;
 
 const el = (id) => document.getElementById(id);
+const UPDATE_APPROVAL_MAX_AGE_MS = 600_000;
 // A single lifecycle state replaces independent flags. Only ready owns
 // an update approval and its timestamp; installation consumes that approval.
 let lifecycle = { kind: 'idle' };
@@ -80,7 +81,9 @@ async function checkNow() {
 async function downloadAndInstall() {
   if (lifecycle.kind !== 'ready') return;
   const { update, checkedAt } = lifecycle;
-  if (Date.now() - checkedAt > 600000) {
+  // An invalid or negative age cannot establish a fresh approval.
+  const age = Date.now() - checkedAt;
+  if (!(age >= 0 && age <= UPDATE_APPROVAL_MAX_AGE_MS)) {
     logLine('Update check is stale; review the refreshed result before installing.');
     await checkNow();
     return;

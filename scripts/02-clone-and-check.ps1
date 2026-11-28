@@ -10,7 +10,8 @@
 # Usage (PowerShell):
 #   .\02-clone-and-check.ps1 -Drive 'F'
 #
-# Requires: script 01 completed (Git + Rust).
+# Requires: script 01 completed (Git + Rust 1.100.0).
+# This script invokes compiler analysis and backend tests; it is not a source-only check.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -39,8 +40,8 @@ if (Test-Path (Join-Path $Project '.git')) {
     if ($LASTEXITCODE -ne 0) { throw "git clone failed (exit $LASTEXITCODE)." }
 }
 
-Write-Host 'Type-checking the Rust shell (cargo check)...'
-& cargo check --locked --manifest-path (Join-Path $Project 'src-tauri\Cargo.toml')
+Write-Host 'Type-checking the Rust shell with the candidate toolchain (cargo +1.100.0 check)...'
+& cargo '+1.100.0' check --locked --manifest-path (Join-Path $Project 'src-tauri\Cargo.toml')
 if ($LASTEXITCODE -ne 0) { throw "cargo check failed (exit $LASTEXITCODE)." }
 
 if (Get-Command mix -ErrorAction SilentlyContinue) {
