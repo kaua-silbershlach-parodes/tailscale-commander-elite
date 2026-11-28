@@ -1,78 +1,132 @@
 # Tailscale Commander Elite
 
-Desktop application foundation by A Elite Estrangeira. Built with Rust, Tauri 2, the operating system WebView, a dependency-free Elixir/OTP backend, and cryptographically signed updates.
+**A Elite Estrangeira · Rust / Tauri 2 · Elixir / OTP · Signed software delivery**
 
-| Channel | Version | Status |
+A security-oriented desktop application foundation built with the operating system's WebView, a Rust native shell, an independent lightweight Elixir/OTP service and cryptographically signed updates. Development prioritizes explicit trust boundaries, a small attack surface, reproducible verification and incremental engineering.
+
+[Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) · [Security audit](SECURITY_AUDIT.md) · [Development checklist](BOOK_CHECKLIST.md) · [Candidate CI](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/workflows/candidate.yml)
+
+## Release status
+
+| Channel | Version | State |
 |---|---|---|
-| Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Published |
-| [Security review](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/tree/review/book1-v1.2.2) | v1.2.2 | Candidate; scoped release authorized, signed publication pending |
+| Published stable | [v1.2.1](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases/tag/v1.2.1) | Available |
+| Integrated candidate | v1.2.2 | Source baseline; production signing and publication pending |
+| Next integrated build | In preparation | Additional Rust verification changes implemented locally; compilation and assessment pending |
 
-**Scope:** This is the desktop foundation, not a functioning Tailscale network client, remote-control service, or complete enterprise Zero Trust architecture. No remote sessions, user authentication, VPN management or device enrollment are implemented by this version.
+> **Development update — 28 November 2026.** The next integrated build is being prepared through a structured Rust engineering review. The changes below have been implemented in the local development workspace and are planned for integration. They are not yet published as an executable or validated by a new build. Historical CI results do not certify these changes. No release date or measured performance gain is claimed.
 
-## Architecture
+## Upcoming improvements
+
+The current work strengthens verification of existing security and release controls rather than introducing unimplemented product features.
+
+| Area | Source-level improvements prepared for the next build |
+|---|---|
+| Secure update transport | Regression helper rejects non-object configurations and malformed or unsafe transport flags; only absent or explicitly false dangerous flags are accepted. |
+| Signed-update invariants | Existing signed-version requirement, downgrade prevention, pinned key and exact HTTPS update endpoint remain covered. |
+| Content Security Policy | Exact nine-directive allowlist, accepting equivalent directive ordering and surrounding whitespace; rejects missing, duplicate, extra, weakened and empty policies. |
+| Structured errors | Typed CSP violations distinguish unexpected, duplicate and missing directives. Rust `Result`, pattern matching and error propagation improve diagnostic precision. |
+| Version integrity | Dedicated pure validator checks Tauri, Cargo and the current Mix manifest format; missing, invalid, incompatible and duplicate version declarations have negative fixtures. |
+| Borrowing and allocation | Manifest version comparison borrows string slices instead of constructing an intermediate comparison string. |
+| Linux iterator verification | Expanded GLib regression covers size hints, exact remaining length, repeated exhaustion, empty arrays, count, out-of-range skips and arithmetic overflow. Authenticated vendor source is unchanged. |
+| Test design | Independent positive and negative fixtures, per-directive omission checks, exact failure categories, diagnostic assertions and preservation of the existing CI regression selector. No newly ignored security tests. |
+
+These changes strengthen **test coverage and diagnostics**, not new runtime enforcement mechanisms. The current local work introduces no additional Rust dependencies, public APIs, interface panels, network permissions or version changes.
+
+### Technical review progress
+
+Three complete chapters of the private Rust reference have been studied: 83 of 559 physical pages (14.85%). Topics include automated tests, modularity, recoverable errors, references, functional abstractions, iterators and closures. The study is targeted rather than sequential from page one. Checkpoints record reading coverage separately from implementation validation. Private reference titles, library paths and local backups are not published.
+
+| Integration gate | Status |
+|---|---|
+| Incremental source review and edits | In progress |
+| Git whitespace/diff checks | Passed for completed checkpoints |
+| Integrated compilation and full Rust tests | Pending |
+| Windows/Linux candidate build and smoke assessment for new changes | Pending |
+| Production signing and isolated installation verification | Pending |
+| New public release | Not published |
+
+## Architecture and current scope
 
 ```mermaid
 flowchart LR
-  UI[HTML CSS JavaScript] -->|Restricted Tauri IPC| Shell[Rust Tauri shell]
-  Shell -->|HTTPS and signed version| Feed[GitHub release feed]
-  Feed --> Artifact[Signed update artifact]
-  Client[Local health client] -->|Loopback HTTP only| BE[Separate Elixir OTP process]
-  BE --> Health[GET /health]
+  UI["HTML / CSS / JavaScript"] -->|"Restricted IPC"| Shell["Rust / Tauri shell"]
+  Shell -->|"HTTPS + signed version"| Feed["GitHub release feed"]
+  Feed --> Artifact["Signed update artifacts"]
+  Client["Local health client"] -->|"IPv4 loopback HTTP"| OTP["Separate Elixir / OTP service"]
+  OTP --> Health["GET /health"]
 ```
 
-The desktop UI has two panels: Updates and Backend. The Backend panel is informational; it does not query, launch, authenticate or supervise the separate backend. The OTP application supervises its own TCP listener. The frontend uses no npm packages or bundler.
+The desktop UI includes Updates and Backend panels. Updates displays the installed version, asks for approval, shows update progress and supports restart. The Backend panel is informational; it does not query, launch, authenticate or supervise the separate backend. The OTP application supervises its own TCP listener. The frontend needs no npm packages or bundler.
 
-| Component | Location | Responsibility |
+This is a desktop foundation, **not a functioning Tailscale VPN client, remote-control service or complete enterprise Zero Trust platform**. VPN management, remote sessions, user authentication and device enrollment are not implemented.
+
+| Layer | Location | Responsibility |
 |---|---|---|
-| Desktop UI | `ui/` | Version display, update approval, progress and restart |
-| Rust shell | `src-tauri/src/` | Tauri lifecycle, updater, logging, restart |
-| Security configuration | `src-tauri/tauri.conf.json`, `capabilities/` | CSP, prototype freezing, IPC permissions and pinned updater key |
-| Backend | `backend/` | Independent OTP health endpoint |
-| Build and installation | `scripts/` | Windows prerequisites, checkout, packaging, installation and smoke checks |
-| Security tooling | `tools/` | Signature verification, authenticated verifier provisioning, vendor integrity and dependency scope |
-| Regression tests | `backend/test/`, `src-tauri/src/lib.rs`, `tests/`, `tools/test_*.py` | Native TCP, shell configuration, UI and security tooling |
-| Workflows | `.github/workflows/` | Candidate CI, scheduled audit, gated release |
-| Third-party backport | `src-tauri/vendor/glib-0.18.5/` | Authenticated GLib source with upstream iterator correction |
+| Desktop UI | `ui/` | Version display and update interface |
+| Native shell | `src-tauri/src/` | Lifecycle, logging, updater and restart |
+| Policy configuration | `src-tauri/tauri.conf.json`, `src-tauri/capabilities/` | CSP, prototype freezing, IPC permissions and pinned update key |
+| OTP backend | `backend/` | Independent loopback health endpoint |
+| Security and release tools | `tests/`, `tools/`, `scripts/` | Regression tests, verification and authorized installation |
+| CI | `.github/workflows/` | Candidate validation, scheduled audit and gated release |
+| Linux compatibility | `src-tauri/vendor/glib-0.18.5/` | Authenticated upstream iterator backport |
 
-## Supported platforms and toolchain
+## Security baseline
 
-| Item | Candidate configuration |
+The integrated candidate already defines the following controls. Their historical verification is separate from the new work above.
+
+- **Backend:** default deny; only valid `GET /health` succeeds. Malformed requests return 400, unsupported routes/methods 404, oversized requests 413 and read timeouts 408. IPv4 loopback, Host validation, duplicate-header rejection, no request body or transfer encoding, 8,192-byte request cap, five-second read deadline and 32 concurrent workers. Health data is unauthenticated and does not prove service identity.
+- **Desktop:** restrictive CSP, prototype freezing and an explicit main-window capability allowlist. No arbitrary shell-execution capability.
+- **Updates:** HTTPS, pinned public key, signatures, signed-version enforcement, downgrade rejection, stale approval revalidation after ten minutes and prevention of concurrent installations.
+- **Independent verifier:** checks the three published platform artifacts and both feed signatures, signed version/file metadata, expected URLs, SHA-256, sizes and duplicate JSON keys; never executes downloaded release artifacts.
+- **Supply chain:** commit-pinned Actions, read-only workflow permissions, locked dependencies, authenticated verifier provisioning and integrity checks over the GLib backport.
+
+See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for trust boundaries, risks and release gates.
+
+## Platforms and toolchain
+
+| Component | Candidate configuration |
 |---|---|
-| Windows | x86-64; MSVC, WebView2; per-user NSIS installer |
-| Linux | x86-64; Ubuntu 22.04 CI, GTK3/WebKitGTK 4.1; AppImage and deb packaging targets |
-| Rust | 1.100.0, locked dependencies |
+| Windows | x86-64, MSVC, WebView2, per-user NSIS installer |
+| Linux | x86-64, Ubuntu 22.04 CI, GTK3/WebKitGTK 4.1, AppImage and deb targets |
+| Rust | 1.100.0; locked dependencies |
 | Tauri | 2.12.7; CLI 2.12.6; updater 2.14.1 |
-| BEAM | CI Elixir 1.17 / OTP 27; project requires Elixir ~> 1.14 |
-| Windows bootstrap | OTP 29.1.2 and Elixir 1.20.5 in script 01 |
-| Test tools | Node.js (built-in test runner), Python 3 and cryptography, trusted minisign 0.12 |
+| Elixir / OTP | CI Elixir 1.17 / OTP 27; project requires Elixir ~> 1.14 |
+| Windows bootstrap | Script 01: OTP 29.1.2 and Elixir 1.20.5 |
+| Verification | Node.js, Python 3, cryptography and trusted minisign 0.12 |
 
-These are validated candidate configurations or explicitly configured packaging targets, not a guarantee of support on every distribution or operating system. macOS and mobile are not validated release targets.
+These are configured or historically validated candidate environments, not blanket platform certification. macOS and mobile are not validated release targets.
 
-## Obtain and build the candidate
+## Obtain the source
 
-Use an isolated checkout for development. Do not install a review build over a production installation. A trusted Git client, Rust toolchain and platform build dependencies are required.
+Use an isolated development checkout; do not install an unsigned review build over production.
 
 ```sh
-git clone --branch review/book1-v1.2.2 https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite.git
+git clone https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite.git
 cd tailscale-commander-elite
+```
+
+The public source is the integrated baseline. New local changes announced here will become available after integration. Use [Releases](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/releases) for published downloads.
+
+### Development build (when authorized)
+
+```sh
 rustup toolchain install 1.100.0 --profile minimal
 cd src-tauri
 cargo +1.100.0 test --locked
 cargo +1.100.0 build --release --locked
 ```
 
-On Windows, use a Visual Studio C++ build environment and WebView2. On Ubuntu, install the system dependencies listed in `candidate.yml`: `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `librsvg2-dev`, `libayatana-appindicator3-dev`, `patchelf` and `file`.
+Windows requires Visual Studio C++ build tools and WebView2. Ubuntu requires `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `librsvg2-dev`, `libayatana-appindicator3-dev`, `patchelf` and `file`. The build creates an unsigned development executable, not signed release bundles.
 
-The build command creates an unsigned development executable. It does not generate, sign, publish or install release bundles. The release workflow is a separate gated process.
-
-### Run the backend
+### Run the separate backend
 
 ```sh
 cd backend
 mix run --no-halt
 ```
 
-In another terminal: `curl http://127.0.0.1:45900/health`
+From another terminal: `curl http://127.0.0.1:45900/health`.
 
 Expected candidate response:
 
@@ -80,82 +134,63 @@ Expected candidate response:
 {"status":"ok","service":"tailscale_commander_elite_backend","version":"1.2.2"}
 ```
 
-`TAILSCALE_COMMANDER_ELITE_BACKEND_PORT` changes the listener port; `0` requests an ephemeral port for tests. With no override the port is 45900. The listener binds IPv4 loopback only. See [backend documentation](backend/README.md).
+`TAILSCALE_COMMANDER_ELITE_BACKEND_PORT` overrides the default port 45900; 0 selects an ephemeral test port. See [backend documentation](backend/README.md).
 
-## Security controls
+## Verification and release engineering
 
-- Default-deny request handling: only a valid `GET /health` succeeds. Malformed requests return 400, unsupported routes/methods 404, oversized requests 413 and read timeouts 408.
-- Loopback binding, Host validation, duplicate-header rejection, no request body or transfer encoding, 8,192-byte request limit, 5-second read deadline, 32 concurrent workers, bounded accept and socket handoff. Health data is non-confidential but unauthenticated; never treat it as proof of service identity.
-- Restrictive content security policy, prototype freezing and an explicit window capability allowlist. No arbitrary shell-execution capability is exposed.
-- Updates use HTTPS and a pinned public key; signed-version enforcement and downgrade prevention are enabled. Stale approval (over ten minutes) requires a new check and user action. Concurrent installation attempts are blocked.
-- The independent verifier checks the three published platform artifacts and both feed signatures, signed version/file metadata, expected release URLs, SHA-256, size and duplicate JSON keys. It never executes release artifacts.
-- GitHub Actions are pinned by commit, use read-only permissions and require strict dependency auditing. Production signing keys are not used by candidate CI.
-- Linux GLib uses the exact registry archive with the two-line upstream correction; CI checks all 121 vendor files and runs a targeted optimized regression.
-
-## Tests and verification
-
-From the repository root:
+When the integrated build is authorized, run the full applicable regression suite. Focused tests help diagnose failures but do not replace the complete suite.
 
 ```sh
 node --test tests/test_ui.cjs
 python -m unittest discover -s tools -p 'test_*.py'
 python tools/verify_glib_vendor.py
 python tools/dependency_scope.py
+python tools/dependency_policy.py
 python tools/verify_release.py latest
 ```
 
-Python signature tests require cryptography and a trusted minisign on PATH. The latest-release command verifies the currently published stable release, not the unsigned candidate. On Linux x86-64, `python tools/bootstrap_minisign.py --bin-dir /path/to/new/private/bin` authenticates the official 0.12 binary before installation; add that directory to PATH for the verification session. On Windows, run python tools/bootstrap_minisign_windows.py --bin-dir with a new private output directory; it checks the previously authenticated archive and executable SHA-256 pins before executing the verifier, then checks the upstream signature. Never run an unverified verifier executable.
+Run backend tests from `backend/` with an ephemeral port (`TAILSCALE_COMMANDER_ELITE_BACKEND_PORT=0 mix test` in POSIX shells; in PowerShell set `$env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT='0'` before `mix test`). Run `cargo test --locked` from `src-tauri/`. On Linux also execute:
 
-Backend tests use an ephemeral port: on PowerShell set `$env:TAILSCALE_COMMANDER_ELITE_BACKEND_PORT='0'`; on POSIX shells use `TAILSCALE_COMMANDER_ELITE_BACKEND_PORT=0 mix test` from `backend/`. Run `cargo test --locked` from `src-tauri/`; on Linux additionally run `cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact` and verify the named test actually ran.
+```sh
+cargo test --release --locked glib_variant_string_iterator_backport_regression -- --exact
+```
 
-### Verified evidence
+Confirm that the named regression actually ran. Python signature tests require cryptography and trusted minisign on PATH. Use the authenticated platform bootstrap scripts in `tools/` before running a newly obtained verifier. The latest-release command verifies the published release, not the local candidate.
 
-Historical evidence at commit [`37f6dff`](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/commit/37f6dff8035eec0e227e0fb1143affe1cf572ab4), [CI run 45888806546](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/runs/45888806546):
+### Historical evidence and dependency risk
 
-| Check | Result |
+Prior integrated-candidate evidence is documented in [SECURITY_AUDIT.md](SECURITY_AUDIT.md), including Windows/Linux builds, Rust/Elixir/UI regressions, verifier tests and hosted ephemeral-key installer smoke tests. See historical [CI run 45888806546](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/runs/45888806546) and the [candidate workflow](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/workflows/candidate.yml). Results apply only to their respective commits.
+
+| Advisory | Baseline disposition |
 |---|---|
-| Windows and Linux native tests and optimized executable builds | Passed |
-| Rust configuration regression tests | 4 Windows; 5 Linux passed |
-| Native Elixir TCP tests | 8 passed per platform |
-| UI updater regression tests | 7 passed per platform |
-| Verifier bootstrap and signature tests | 6 + 7 passed |
-| Exact GLib backport and optimized Linux test | Passed |
-| Strict Cargo Audit | Failed on 2 maintenance warnings |
-| Candidate signed bundles and installation smoke test | Hosted Windows ephemeral-key test added; result pending |
+| RUSTSEC-2026-0594 | cookie updated to 0.18.3 |
+| RUSTSEC-2024-0429 | GLib 0.18.5 authenticated local backport; [upstream PR 1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343) |
+| RUSTSEC-2026-0543 | chrono optional metadata/lockfile entry; absent from reviewed Windows/Linux build trees |
+| RUSTSEC-2024-0370 | proc-macro-error Linux build-time dependency |
 
-These results apply to the cited commit, not automatically to later changes. Review the [current candidate CI](https://github.com/kaua-silbershlach-parodes/tailscale-commander-elite/actions/workflows/candidate.yml) for the latest evidence.
+The unfiltered strict audit remains visible. Only the two exact maintenance warnings accepted in the risk policy are temporarily permitted, until 27 December 2026 UTC (exclusive). Any vulnerability, other warning, scan failure, expiry or scope drift blocks the applicable release gate. No scanner ignore flags are used. The GLib registry version remains 0.18.5; the local backport is not an upstream published fix.
 
-## Dependency risk and release status
-
-| Advisory | Disposition |
-|---|---|
-| RUSTSEC-2026-0594 (cookie) | Updated to 0.18.3; prior advisory absent on rescan |
-| RUSTSEC-2024-0429 (GLib) | Local backport of [upstream PR 1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343); integrity and optimized Linux regression passed |
-| RUSTSEC-2026-0543 (chrono) | Optional metadata/lockfile entry; absent from current Windows and Linux build trees; no fixed published upgrade |
-| RUSTSEC-2024-0370 (proc-macro-error) | Linux build-time procedural macro dependency; no fixed published upgrade |
-
-The unfiltered `cargo audit --json --deny warnings` report remains visible. On 2026-11-27 the owner accepted only the two exact maintenance warnings above, until 2026-12-27 UTC (exclusive). The policy gate verifies the report, exact IDs and versions, expiry and target scope; any vulnerability, other warning, scan failure or scope drift blocks the build. No scanner ignore flags are used. Run `python tools/dependency_policy.py` with cargo-audit 0.23.0 installed. See [SECURITY_AUDIT.md](SECURITY_AUDIT.md). The upstream GLib version remains 0.18.5; its absence from a registry-oriented scanner report is not an upstream fix.
-
-## Windows installation and release operations
-
-The numbered scripts are for an explicitly authorized installation or release environment, not an automatic action for review builds:
+### Authorized Windows release workflow
 
 | Script | Purpose |
 |---|---|
-| `01-install-prerequisites.ps1` | Provisions missing WinGet, Python and platform/toolchain prerequisites; uses hash-pinned official Windows x64 Tauri CLI |
-| `02-clone-and-check.ps1` | Checks out the configured repository, rejects dirty existing clones and validates build/backend |
-| `03-build-installer.ps1` | Requires recorded release approval, clean checkout, dependency risk policy and an existing restricted matching signing key; verifies the signed installer |
-| `04-install-app.ps1` | Requires recorded release approval and checks the exact installer and signature before per-user installation |
-| `05-run-smoke-tests.ps1` | Verifies installed version, exact published release version, launch and unauthenticated local backend liveness |
+| `01-install-prerequisites.ps1` | Provision missing platform/toolchain prerequisites |
+| `02-clone-and-check.ps1` | Clean checkout and validation |
+| `03-build-installer.ps1` | Authorized signing and installer verification |
+| `04-install-app.ps1` | Verify and install approved per-user artifact |
+| `05-run-smoke-tests.ps1` | Verify version, launch and backend liveness |
 
-Clean Windows Sandbox testing confirmed installation of WinGet, Git, Python, Visual Studio Build Tools, WebView2 and Rust. Full clean-machine bootstrap and rollback remain unverified. The official pinned Tauri CLI binary was verified on an existing Windows host. Python and trusted minisign must be available before scripts 03–05. Script 05 pre-release mode is explicitly not release approval. The separate backend must be started before its health check. Never print or commit private signing keys, passwords or access tokens.
+Release signing requires recorded approval, completed pre-signing assessment and a passing dependency policy. Version tags trigger the gated release build; publishing signed bundles and the update feed is separate. Candidate CI uses disposable signing material for isolated smoke tests, not production keys. Full clean Windows bootstrap/rollback, independent semantic reread of the first reference and production signed v1.2.2 bundles with isolated installation verification remain open. Never commit signing keys, passwords, access tokens or private review artifacts.
 
-Release CI and the local signing script require recorded approval, a completed pre-signing assessment and a passing dependency risk policy before signing. Book 1 closes only after signed-release and isolated installation verification; the separate assessment avoids a circular release gate. The preflight rejects duplicate/conflicting approval markers and inconsistent versions. Local installation requires the recorded approval as well. It builds platform bundles on version tags; publishing a GitHub release and `latest.json` is a separate operation. A candidate push does not create a new release. Candidate CI includes a separate Windows hosted-runner-only NSIS signing, signature verification, installation, launch and uninstall smoke test with a newly generated throwaway key. It does not access production signing material, upload test installers, install on an operator machine or prove a production release is signed. The exact published version still requires independent verification.
+## Roadmap
 
-## Audit and development policy
+1. Continue technical review and record applicable improvements to existing code.
+2. Integrate reviewed changes, run the native test suites and build Windows/Linux candidates.
+3. Resolve any failures, rerun applicable security gates and complete the independent assessment.
+4. After authorization, sign and verify production artifacts, perform isolated installation checks and publish the release.
 
-Book 1 remains open. Its applicable controls, risk register, historical evidence and authorization gate are documented in [SECURITY_AUDIT.md](SECURITY_AUDIT.md). The book-by-book sequence is tracked in [BOOK_CHECKLIST.md](BOOK_CHECKLIST.md). Every material change requires renewed inventory, relevant source review and applicable tests. No later book is claimed complete.
+There is no announced release date. The upcoming build is preparation work, not an available download. See [BOOK_CHECKLIST.md](BOOK_CHECKLIST.md) for the integrated baseline's audit trail; new local checkpoints are pending integration.
 
 ## License
 
-First-party code: Copyright 2026 A Elite Estrangeira. All rights reserved; see [LICENSE](LICENSE). Third-party GLib source retains its original [license](src-tauri/vendor/glib-0.18.5/LICENSE) and [copyright notices](src-tauri/vendor/glib-0.18.5/COPYRIGHT).
+Copyright 2026 A Elite Estrangeira. All rights reserved for first-party code; see [LICENSE](LICENSE). Third-party GLib retains its original [license](src-tauri/vendor/glib-0.18.5/LICENSE) and [copyright notices](src-tauri/vendor/glib-0.18.5/COPYRIGHT).
