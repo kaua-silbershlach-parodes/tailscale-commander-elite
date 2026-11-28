@@ -1,0 +1,120 @@
+name: Publish verified v1.2.3
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v1.2.3.yml']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-v1.2.3
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'kaua-silbershlach-parodes/tailscale-commander-elite'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ed2930cc725dc3ababf4a607082bd88f20cef8ff
+          persist-credentials: false
+      - name: Authenticate independent signature verifier
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          /usr/bin/python3 tools/bootstrap_minisign.py --bin-dir "$RUNNER_TEMP/tce-publish-minisign"
+          echo "$RUNNER_TEMP/tce-publish-minisign" >> "$GITHUB_PATH"
+      - name: Verify exact successful run, stage draft, publish signed artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: kaua-silbershlach-parodes/tailscale-commander-elite
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import datetime, hashlib, json, pathlib, subprocess, tempfile, zipfile, sys
+          sys.path.insert(0, 'tools')
+          import verify_release as v
+
+          repo = 'kaua-silbershlach-parodes/tailscale-commander-elite'
+          run_id = 46112915352
+          sha = 'ed2930cc725dc3ababf4a607082bd88f20cef8ff'
+          tag = 'v1.2.3'
+          version = '1.2.3'
+          expected = {
+              'windows': (15251420440, '3d5b5e3c0cf5cd4d3e3853b5c9518ca7aa344832ec2be34572a8aa290db9503a'),
+              'linux': (15251341334, '9374141f3c1af65c539745443cef84a925ff69302f8127cb0bb31c4e32ccc795'),
+          }
+          def api(path):
+              return json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/{path}'], timeout=60))
+          def require(ok, message):
+              if not ok:
+                  raise RuntimeError(message)
+          def sha256_file(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as f:
+                  for block in iter(lambda: f.read(65536), b""):
+                      digest.update(block)
+              return digest.hexdigest()
+          run = api(f'actions/runs/{run_id}')
+          require(run['head_sha']==sha and run['head_branch']==tag and run['event']=='push' and run['status']=='completed' and run['conclusion']=='success', 'Run mismatch or incomplete')
+          ref = api('git/ref/tags/'+tag)
+          require(ref['object']['type']=='commit' and ref['object']['sha']==sha, 'Tag changed')
+          jobs = api(f'actions/runs/{run_id}/jobs?per_page=100')
+          required = {'authorization','candidate / dependencies','candidate / platform (windows-latest)','candidate / security','candidate / platform (ubuntu-22.04)','linux','windows'}
+          require({x['name'] for x in jobs['jobs']}==required and all(x['conclusion']=='success' for x in jobs['jobs']), 'Required checks missing')
+          items = api(f'actions/runs/{run_id}/artifacts?per_page=100')['artifacts']
+          require(len(items)==2 and {a['name'] for a in items}==set(expected), 'Artifact set mismatch')
+          require(api('releases/latest')['tag_name']=='v1.2.2', 'Unexpected current stable release')
+          require(not any(x['tag_name']==tag for x in api('releases?per_page=100')), 'Release already exists; do not overwrite')
+          config = pathlib.Path('src-tauri/tauri.conf.json').resolve()
+          require(json.loads(config.read_text())['version']==version, 'Config version mismatch')
+          with tempfile.TemporaryDirectory() as tmp:
+              d = pathlib.Path(tmp)
+              windows, appimage, deb = v.names(version)
+              for item in items:
+                  name = item['name']
+                  aid, digest = expected[name]
+                  require(item['id']==aid and item['digest']=='sha256:'+digest and not item['expired'], 'Artifact identity mismatch')
+                  require(item['workflow_run']['head_sha']==sha and item['workflow_run']['id']==run_id, 'Artifact provenance mismatch')
+                  archive = d/(name+'.zip')
+                  with archive.open('xb') as out:
+                      subprocess.run(['gh','api',f'repos/{repo}/actions/artifacts/{aid}/zip'],stdout=out,check=True,timeout=240)
+                  require(archive.stat().st_size<=150*1024*1024 and sha256_file(archive)==digest, 'Archive digest mismatch')
+                  allowed = [windows] if name=='windows' else [appimage, deb]
+                  allowed = set(allowed+[n+'.sig' for n in allowed])
+                  with zipfile.ZipFile(archive) as z:
+                      selected = {}
+                      for member in z.infolist():
+                          if member.is_dir():
+                              continue
+                          basename = pathlib.PurePosixPath(member.filename).name.replace(' ','.')
+                          require(basename in allowed and basename not in selected, 'Unexpected archive member')
+                          require(0<member.file_size<= (1000000 if basename.endswith('.sig') else v.MAX_ARTIFACT), 'Invalid artifact size')
+                          selected[basename] = member
+                      require(set(selected)==allowed, 'Missing archive members')
+                      for basename, member in selected.items():
+                          with (d/basename).open('xb') as out, z.open(member) as inp:
+                              import shutil
+                              shutil.copyfileobj(inp,out)
+              files = [windows, appimage, deb]
+              for name in files:
+                  v.verify(d/name, (d/(name+'.sig')).read_text('ascii'), config, version)
+              notes = 'Integrates CP01–CP23: hardened updater lifecycle, restart recovery, Rust security regressions, bounded Elixir health service, and verified release controls.'
+              base = v.PREFIX+tag+'/'
+              feed = {'version':version,'notes':notes,'pub_date':datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z'),'platforms':{platform:{'url':base+name,'signature':(d/(name+'.sig')).read_text('ascii').strip()} for platform,name in [('windows-x86_64',windows),('linux-x86_64',appimage)]}}
+              v.validate_feed(feed,version)
+              (d/'latest.json').write_text(json.dumps(feed,indent=2)+'\n',encoding='utf8')
+              names = ['latest.json', *files, *(n+'.sig' for n in files)]
+              subprocess.run(['gh','release','create',tag,'--repo',repo,'--verify-tag','--draft','--title', 'Tailscale Commander Elite v1.2.3','--notes',notes,*[str(d/n) for n in names]],check=True,timeout=300)
+              releases = [x for x in api('releases?per_page=100') if x['tag_name']==tag]
+              require(len(releases)==1 and releases[0]['draft'], 'Draft not found')
+              draft = releases[0]
+              assets = {x['name']:x for x in draft['assets']}
+              require(len(draft['assets'])==len(names) and set(assets)==set(names), 'Draft asset set mismatch')
+              for name in names:
+                  digest = 'sha256:'+sha256_file(d/name)
+                  require(assets[name]['digest']==digest and assets[name]['size']==(d/name).stat().st_size,'Uploaded asset mismatch: '+name)
+              subprocess.run(['gh','release','edit',tag,'--repo',repo,'--draft=false','--latest'],check=True,timeout=60)
+          PY
+      - name: Independently verify public release and automatic-update feed
+        run: /usr/bin/python3 tools/verify_release.py latest --expected-version 1.2.3
